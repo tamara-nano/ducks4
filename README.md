@@ -7,6 +7,13 @@ We have developed an integrated approach combining an optimized wet-lab protocol
 
 docker pull ducks4
 
+or 
+
+git clone file.git
+
++ install requirements: minimap2, samtools, clair3, sniffles2, whatshap, pandas, pysam, R (with packages dplyr, tidyr)
+  
+
 # Usage
 
 Show infos via:
