@@ -8,7 +8,17 @@ Update: DUCKS4 now also calls directly the PAS-sequence to each reads and provid
 
 ## Installation
 
+Pull docker image: 
+
 docker pull fshd_ducks4
+
+or 
+
+Build image with dockerfile:
+
+download repository and unzip it
+cd /path/ducks4/
+docker build -t fshd_ducks4 .
 
 ## Usage
 
@@ -86,6 +96,7 @@ Sometimes it will be necessary to further determine the sub-haplotype of the all
 \< Insert scheme here\>
 
 ## Example Data
+
 
 
 
