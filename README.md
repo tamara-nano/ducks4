@@ -84,3 +84,8 @@ DUCKS4 gives following output:
 Sometimes it will be necessary to further determine the sub-haplotype of the allele. Therefore a scheme was developed to make it easy to distinguish the haplotypes (Tab.1) (sub-HP-help-sheet.xlsx). With the bed-file “Subhaplotypes-regions.bed” (found in the DUCKS4 folder where also the script is) the necessary regions and also all relevant SNPs within D4F104S1 and the pLAM region as well as the restriction sites for BinI and XapI within the proximal D4Z4-RUs are marked. Relevant is the SSLP repeat in CLUHP-4-201 gene and the first 3-5 repeat units with the restriction enzyme sites of the D4Z4-array which needs to be manually inspected. There are three types of RU: chr4 – B-X+, chr10 – B+X- and a mix type – B-X-: The “+, plus” means the sequence of the restriction site is correct: B: CCTAGG and X: AAATTCC, if a SNP is found there then the restriction site is disabled “-, minus“. The blast-workflow only distinguishes between chr4 and chr10 repeat units and doesn't detect hybrid D4Z4 (B-X-) RU. The inspection of the restriction sites of the RU is only necessary in the case for 4A166Ha/b/c and 4A166 as the scheme itself is not enough to distinguish between those. 4A166 is NOT permissive for FSHD while 4A166H is! To further distinguish those haplotypes the analysis of the restriction sites for BinI (B) and XapI (X) is necessary. 4A166H has following D4Z4 order: c10-c10-c4…, while 4A166 has mix-mix-c4….
 
 \< Insert scheme here\>
+
+## Example Data
+
+
+
