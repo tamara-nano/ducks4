@@ -110,6 +110,13 @@ HG002
 HG003
 
 
+## Publication
+
+If using the workflow for a publication please cite:
+
+<Insert Paper-citation>
+
+
 
 
 
