@@ -9,6 +9,11 @@ We have developed an integrated approach combining an optimized wet-lab protocol
 **Update:** 
 v2.1.0: DUCKS4 now also calls directly the PAS-sequence to each read if pLAM is available and provides it in the haplotypes-resolved output csv-files. It tests if the PAS is intact (4qA), 10qA or differently disrupted. 
 
+## Prerequisite
+
+This project requires [Docker](https://docs.docker.com/get-docker/) to be installed on your system.
+Please follow the official installation instructions for your operating system.
+
 ## Installation
 
 Pull docker image: 
@@ -116,6 +121,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
