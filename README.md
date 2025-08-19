@@ -65,7 +65,6 @@ For showing more infos:
 | --ref | optional, provide own reference, else the T2T-chm13v2.0 ref from the DUCKs4-wf is used. |
 | --methyl | optional, methylation calling with modkit, target region: chr4:193540172-193543634 (2 most distal RU + gene-body with pLAM). |
 | --region | optional, provide genomic region (e.g. chr1:1-100). Only REQUIRED if --ref & --methyl are set. Default for T2T_chm13v2.0 ref (when no --ref is given) = chr4:193540172-193543634. |
-| --variant | optional, mapping to HG38, variant calling with clair3, sniffles2 (sniffles2 also calls against the T2T-aligned bam-file), phasing with whatshap and variant annotation with SNPEff and SnpSift against ClinVar (v20250729). |
 | --threads | optional, set threads. |
 
 The output is saved in the folder where the alignment.bam is located.
@@ -116,6 +115,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
