@@ -56,7 +56,7 @@ The DUCKS4-results makes it easy to directly select reads for individal subset f
 
 For showing more infos:
 
-`docker run -it --rm -v $(pwd):/data fshd_ducks4 python3 /ducks4/id2bam2meth.py --help`
+`docker run -it --rm -v $(pwd):/data fshd_ducks4 python3 /ducks4/DUCKS4_ID2bam2meth.py --help`
 
 | **tags** | **Infos** |
 |:-----------------------------|:-----------------------------------------|
@@ -115,6 +115,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
