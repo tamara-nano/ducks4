@@ -27,7 +27,7 @@ docker build -t fshd_ducks4 .
 
 For running the tool:
 
-`docker run -it --rm -v $(pwd):/data fshd_ducks4 --input /data/mysample.bam --methyl --threads 24 --variant`
+`docker run --rm -v $(pwd):/data fshd_ducks4 --input /data/mysample.bam --methyl --variant`
 
 For showing more infos:
 
@@ -115,6 +115,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
