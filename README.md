@@ -13,15 +13,16 @@ v2.1.0: DUCKS4 now also calls directly the PAS-sequence to each read if pLAM is 
 
 Pull docker image: 
 
-docker pull fshd_ducks4
+`docker pull fshd_ducks4`
 
 or 
 
 Build image with dockerfile:
 
 download repository and unzip it \
-cd /path/ducks4/  \
-docker build -t fshd_ducks4 .  
+`cd /path/ducks4/`
+
+`docker build -t fshd_ducks4 .  `
 
 ## Usage
 
@@ -48,7 +49,7 @@ The DUCKS4-results makes it easy to directly select reads for individal subset f
 
 **Note**: Subsetting reads are f.ex. necessary when 2 4qA alleles are present and the methylation status should be called. The tool can't distinguish two 4qA alleles.
 
-`docker run --rm -v "$(pwd)":/data --entrypoint python3 fshd-ducks4 /ducks4/DUCKS4_ID2bam2meth.py
+`docker run --rm -v "$(pwd)":/data --entrypoint python3 fshd_ducks4 /ducks4/DUCKS4_ID2bam2meth.py
   --txt /data/read-id.txt
   --bam /data/sample.bam
   --methyl
@@ -115,6 +116,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
