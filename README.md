@@ -109,11 +109,10 @@ Sometimes it will be necessary to further determine the sub-haplotype of the all
 
 ## Example Data
 
-HG001
+Example data can be found on Figshare: 10.6084/m9.figshare.29930690
 
-HG002
+This repository contains the sequencing data from the human reference genomes HG001, HG002 and HG003 from the whole genome sequencing and adaptive sampling runs with long-read sequencing with Nanopore (Oxford Nanopore Technologies, UK). The high molecular weight (HMW) DNA from the cell-cultures were extracted with Monarch HMW-DNA Extraction Kit for Tissue (NEB, US) and the library prepared with SQK-ULK114 Kit (Oxford Nanopore Technologies, UK). The data were basecalled with Dorado basecaller with methylation calling for 5mCG and 5hmCG in SUP mode. The sequencing data are mapped, indexed and sorted bam files aligned to the T2T-chm13v2.0 reference and further filtered for the D4Z4 locus on chromosome 4 (4q35) and the homologous region on chromosome 10 (10q26). 
 
-HG003
 
 
 ## Publication
@@ -121,6 +120,7 @@ HG003
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
