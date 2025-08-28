@@ -20,14 +20,9 @@ Pull docker image:
 
 `docker pull fshd_ducks4`
 
-or 
+**Note:**
 
-Build image with dockerfile:
-
-download repository and unzip it \
-`cd /path/ducks4/`
-
-`docker build -t fshd_ducks4 .  `
+This repository only contains the scripts, it can't therefore not be build via dockerfile.
 
 ## Usage
 
@@ -120,6 +115,7 @@ This repository contains the sequencing data from the human reference genomes HG
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
