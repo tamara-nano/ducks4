@@ -18,7 +18,7 @@ Please follow the official installation instructions for your operating system.
 
 Pull docker image: 
 
-`docker pull fshd_ducks4`
+`docker pull ghcr.io/tamara-nano/fshd_ducks4:latest`
 
 **Note:**
 
@@ -115,6 +115,7 @@ This repository contains the sequencing data from the human reference genomes HG
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
