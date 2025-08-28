@@ -28,11 +28,11 @@ This repository only contains the scripts, it can't therefore not be build via d
 
 For running the tool:
 
-`docker run --rm -v $(pwd):/data fshd_ducks4 --input /data/mysample.bam --methyl --variant`
+`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:latest --input /data/mysample.bam --methyl --variant`
 
 For showing more infos:
 
-`docker run -it --rm -v $(pwd):/data fshd_ducks4 --help`
+`docker run -it --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:latest --help`
 
 | **tags** | **Infos** |
 |:-----------------------------|:-----------------------------------------|
@@ -49,15 +49,15 @@ The DUCKS4-results makes it easy to directly select reads for individal subset f
 
 **Note**: Subsetting reads are f.ex. necessary when 2 4qA alleles are present and the methylation status should be called. The tool can't distinguish two 4qA alleles.
 
-`docker run --rm -v "$(pwd)":/data --entrypoint python3 fshd_ducks4 /ducks4/DUCKS4_ID2bam2meth.py
-  --txt /data/read-id.txt
-  --bam /data/sample.bam
-  --methyl
+`docker run --rm -v "$(pwd)":/data --entrypoint python3 ghcr.io/tamara-nano/fshd_ducks4:latest /ducks4/DUCKS4_ID2bam2meth.py \
+  --txt /data/read-id.txt \
+  --bam /data/sample.bam \
+  --methyl \
   --region chr4:193540172-193543634`
 
 For showing more infos:
 
-`docker run -it --rm -v $(pwd):/data fshd_ducks4 python3 /ducks4/DUCKS4_ID2bam2meth.py --help`
+`docker run -it --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:latest python3 /ducks4/DUCKS4_ID2bam2meth.py --help`
 
 | **tags** | **Infos** |
 |:-----------------------------|:-----------------------------------------|
@@ -115,6 +115,7 @@ This repository contains the sequencing data from the human reference genomes HG
 If using the workflow for a publication please cite:
 
 <Insert Paper-citation>
+
 
 
 
