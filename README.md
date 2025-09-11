@@ -24,6 +24,8 @@ Pull docker image:
 
 This repository only contains the scripts, it can't therefore not be build via dockerfile.
 
+A smaller version of DUCKS4 without a variant-calling pipeline is also available: ([DUCKS4_wovar](https://github.com/tamara-nano/ducks4_wovar))
+
 ## Usage
 
 For running the tool:
@@ -117,6 +119,7 @@ This repository contains the sequencing data from the human reference genomes HG
 If using the workflow for a publication please cite:
 
 <Löwenstern T., Madritsch M., Horner D., Brait N., Güleray Lafci N., Schachner A., Gerykova Bujalkova M., Kałużewski T., Szyld P., Hengstschläger M., Dremsek P., Laccone F. DUCKS4: A comprehensive workflow for Nanopore sequencing analysis of Facioscapulohumeral Muscular Dystrophy (FSHD). Manuscript in preparation.>
+
 
 
 
