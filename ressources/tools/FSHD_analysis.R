@@ -870,7 +870,7 @@ write.csv2(stats_B, row.names = FALSE)
 cat('\n')
 cat('____________________________')
 cat('\n')
-cat('Statistics - Chimeric reads (possible sub-haplotypes or (in rare events) Translocations):')
+cat('Statistics - Chimeric reads (possible sub-haplotypes or (in rare events) translocations):')
 cat('\n')
 write.csv2(stats_chim, row.names = FALSE)
 cat('\n')
@@ -900,10 +900,8 @@ cat('____________________________')
 
 cat('\n')
 cat('\n')
-cat('Chimeric reads: Indicates sub-haplotypes or even possible translocation')
+cat('Chimeric reads:')
 cat('\n')
-cat('\n')
-cat('Detection of possible translocations between chr4 and chr10.')
 cat('\n')
 cat('Shows haplotype for proximal (D4F104S1) and distal (pLAM) end of the D4Z4-array of the chimeric reads.')
 cat('\n')
@@ -966,5 +964,6 @@ file.rename(pas, target)
 #################################################################################################################################
 ####                 FINISH :)             #####
 #################################################################################################################################
+
 
 
