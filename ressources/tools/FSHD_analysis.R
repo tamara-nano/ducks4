@@ -2,10 +2,22 @@ library(dplyr)
 library(tidyr)
 
 
-# R-script for analyzing blastn-out of FSHD-regions (blastn with -outfmt 6) 
+  #################################
+  #                               #
+  ###### DUCKS4 - Version 1 ####
+  #                               #
+  #################################
+
+# R-script for analyzing blastn-out of FSHD-regions (blastn with -outfmt 6) and database /ducks4/ressources/blast_db/FSHD_blast
+
 
 
 titles <- c("read-id", "region", "percent-identity", "region-length", "length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send", "e-value", "bitscore")
+
+
+
+# Input of your blastn outfmt 6 .txt file 
+
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -18,7 +30,9 @@ mat <- read.table(args[1], header = FALSE, col.names = titles, fill=TRUE,strings
 pas <- read.table(args[2], header = TRUE, fill=TRUE,stringsAsFactor=FALSE)
 setwd(args[3])
 
-##
+
+
+#####
 
 region <- unique(mat$region)
 
@@ -58,10 +72,10 @@ matsub_fin <- mat %>%
   # delete c10_D4Z4 before CLUHP4 but only if the order CLUHP4 - D4F104S1 is there
   filter(!(region %in% "c10_D4Z4" & 
              !is.na(control) & !is.na(A_start) & control < A_start & qstart < control)) %>%
-  # same for reverse read (Reverse-Read)
+  # Same for reverse read (Reverse-Read)
   filter(!(region %in% "c10_D4Z4" & 
              !is.na(control) & !is.na(A_start) & control > A_start & qstart > control)) %>%
-  # label all c4_D4Z4 to c4_ctrl
+  # Label all c4_D4Z4 to c4_ctrl
   mutate(
     region = case_when(
       region == "c4_D4Z4" & 
@@ -122,19 +136,21 @@ no_hit_reads <- matsub_updated %>%
     percent.identity = list(rep(1, length(expected_offsets)))  
   ) %>%
   unnest(c(qstart, region, percent.identity)) %>%
-  ungroup()  
+  ungroup()  # Beende die Gruppierung
 
 matsub_final <- matsub_updated %>%
   bind_rows(no_hit_reads) %>%
   arrange(read.id, qstart) %>%
   group_by(read.id, region) %>%
   filter(
+    # Wenn Region c10_ctrl ??? only keep longest
     (region != "c10_ctrl") | (length == max(length))
   ) %>%
   ungroup()
 
 
-### Count RU
+#######
+
 
 chr4.d4z4count <- matsub_final %>%
   filter(region == "c4_D4Z4" & length > 1500) %>%
@@ -179,16 +195,18 @@ false_c10_ctrl <- matneu %>%
 
 matfilt <- matneu %>%
   filter(!(read.id %in% false_4qB$read.id)) %>%
-  filter(!(read.id %in% false_D4F104S1$read.id))
+  filter(!(read.id %in% false_D4F104S1$read.id)) %>%
+  filter(!(read.id %in% false_c10_ctrl$read.id))
+  
 
 D4Z4_only <- matneu %>%
   filter(!is.na(RU_count)) %>%
-  filter(if_all(any_of(c("A_D4F104S1_4qA", "A_pLAM_4qA", "B_D4F104S1_4qB", "c10_D4F104S1_10qA", "B_pLAM_4qB", "pLAM_4qB_low_pid", "CLUHP4_201_exon1", "DUX4_end", "c10_ctrl")), is.na))
+  filter(if_all(any_of(c("A_D4F104S1_4qA", "A_pLAM_4qA", "B_D4F104S1_4qB", "c10_D4F104S1_10qA", "c10_pLAM", "B_pLAM_4qB", "pLAM_4qB_low_pid", "CLUHP4_201_exon1", "DUX4_end", "c10_ctrl")), is.na))
 
 matfilt_final <- matfilt %>%
   filter(!(read.id %in% D4Z4_only$read.id))
 
-##sort matfilt2
+# sort matfilt2
 cols_to_keep <- c("read.id", "c10_ctrl", "pLAM_4qB_low_pid", "c4_ctrl", "CLUHP4_201_exon1",
                   "A_D4F104S1_4qA", "B_D4F104S1_4qB", "c10_D4F104S1_10qA",
                   "A_pLAM_4qA", "B_pLAM_4qB", "c10_pLAM", "DUX4_end",
@@ -201,12 +219,23 @@ for (col in cols_to_keep) {
 }
 matfilt_final <- matfilt_final[, cols_to_keep]
 
+D4Z4 <- matsub_final %>%
+  filter((read.id %in% D4Z4_only$read.id))
 
+
+matsub_final <- matsub_final %>%
+  filter(!(read.id %in% false_4qB$read.id)) %>%
+  filter(!(read.id %in% false_D4F104S1$read.id)) %>%
+  filter(!(read.id %in% false_c10_ctrl$read.id)) %>%
+  filter(!(read.id %in% false_c10_ctrl$read.id)) %>%
+  filter(!(read.id %in% D4Z4_only$read.id))
+  
 
 # create repeat-order
 
+
 repeat_order <- matsub_final %>%
-  select(read.id, region, percent.identity, qstart, length) %>%
+  select(read.id, region, percent.identity, qstart, qend, length) %>%
   mutate(type = case_when(
     grepl("c10_D4F104S1_10qA", region) ~ "10qA_D4F104S1",
     grepl("B_D4F104S1_4qB", region) ~ "4qB_D4F104S1",
@@ -252,10 +281,9 @@ gaps <- repeat_order %>%
     next_qstart = lead(qstart),
     gap_size = next_qstart - qstart
   ) %>%
-  # only when both neighbouring RU-types c4 and c10 and a gap >5kb
   filter(this_is_D4Z4 & next_is_D4Z4 & gap_size > 5000) %>%
   mutate(
-    qstart = qstart + 1,  # gap starts directly after current RU
+    qstart = qstart + 1,  
     region = paste0("gap_", gap_size, "bp"),
     percent.identity = NA,
     length = NA,
@@ -263,10 +291,42 @@ gaps <- repeat_order %>%
   ) %>%
   select(read.id, region, percent.identity, qstart, length, type)
 
-# insert gap-regions
-repeat_order <- repeat_order %>%
-  bind_rows(gaps) %>%
+
+read_ends <- matsub_final %>%
+  mutate(qend = as.numeric(qend)) %>%
+  group_by(read.id) %>%
+  summarise(read_end = max(qend, na.rm = TRUE), .groups = "drop")
+
+gaps_5prime <- repeat_order %>%
+  filter(type %in% c("c4", "c10")) %>%
+  filter(type %in% c("c4", "c10")) %>%
+  group_by(read.id) %>%
+  summarise(first_qstart = min(qstart), .groups = "drop") %>%
+  mutate(
+    gap_size = first_qstart - 1
+  ) %>%
+  filter(gap_size > 5000) %>%     # only keep “real” flanks
+  transmute(
+    read.id,
+    region = paste0("end_", gap_size, "bp"),
+    percent.identity = NA_real_,
+    qstart = 1,
+    qend   = first_qstart - 1,
+    length = gap_size,
+    type   = region
+  )
+
+
+RU_with_gaps <- repeat_order %>%
+  bind_rows(gaps, gaps_5prime) %>%
   arrange(read.id, qstart)
+
+
+
+# insert gap-regions into annotation
+ repeat_order <- RU_with_gaps %>%
+   bind_rows(gaps) %>%
+   arrange(read.id, qstart)
 
 # label most distal RU before `_pLAM` with S or L
 repeat_order <- repeat_order %>%
@@ -304,12 +364,12 @@ matfilt_final <- matfilt_final %>%
 D4Z4_onlysort <- D4Z4_only[order(D4Z4_only$RU_count, decreasing = TRUE),]
 D4Z4_only_count <- table(D4Z4_onlysort$RU_count)
 
-matD <- matsub_final %>%
+matD <- D4Z4 %>%
   filter(read.id %in% D4Z4_onlysort$read.id)
 
 
 D4Z4_RU <- matD %>%
-  select(read.id, region, percent.identity, qstart, length) %>%
+  select(read.id, region, percent.identity, qstart, qend, length) %>%
   mutate(type = case_when(
     grepl("c10_D4F104S1_10qA", region) ~ "10qA_D4F104S1",
     grepl("B_D4F104S1_4qB", region) ~ "4qB_D4F104S1",
@@ -343,16 +403,84 @@ D4Z4_RU <- matD %>%
   select(-cluster) %>%
   arrange(read.id, qstart)
 
-# create repeat-sequence
-D4Z4_RU_order <- D4Z4_RU %>%
-  filter(!is.na(type)) %>%
+# test if gaps are between c4/c10 and insert gap_size
+gaps_internal <- D4Z4_RU %>%
+  arrange(read.id, qstart) %>%
   group_by(read.id) %>%
-  summarise(repeat_sequence = paste(type, collapse = " - ")) %>%
+  mutate(
+    this_is_D4Z4 = type %in% c("c4", "c10"),
+    next_is_D4Z4 = lead(type) %in% c("c4", "c10"),
+    next_qstart  = lead(qstart),
+    this_qend    = qend,
+    gap_size     = next_qstart - this_qend - 1
+  ) %>%
+  filter(this_is_D4Z4 & next_is_D4Z4 & gap_size > 5000) %>%
+  transmute(
+    read.id,
+    region = paste0("gap_", gap_size, "bp"),
+    percent.identity = NA_real_,
+    qstart = this_qend + 1,
+    qend   = next_qstart - 1,
+    length = gap_size,
+    type   = region          
+  ) %>%
   ungroup()
+
+read_ends <- matD %>%
+  mutate(qend = as.numeric(qend)) %>%
+  group_by(read.id) %>%
+  summarise(read_end = max(qend, na.rm = TRUE), .groups = "drop")
+
+gaps_5prime <- D4Z4_RU %>%
+  filter(type %in% c("c4", "c10")) %>%
+  group_by(read.id) %>%
+  summarise(first_qstart = min(qstart), .groups = "drop") %>%
+  mutate(
+    gap_size = first_qstart - 1
+  ) %>%
+  filter(gap_size > 5000) %>%     # only keep “real” flanks
+  transmute(
+    read.id,
+    region = paste0("end_", gap_size, "bp"),
+    percent.identity = NA_real_,
+    qstart = 1,
+    qend   = first_qstart - 1,
+    length = gap_size,
+    type   = region
+  )
+
+D4Z4_RU_with_gaps <- D4Z4_RU %>%
+  bind_rows(gaps_internal, gaps_5prime) %>%
+  arrange(read.id, qstart)
+
+read_class <- D4Z4_RU_with_gaps %>%
+  group_by(read.id) %>%
+  summarise(
+    only_D4Z4   = all(type %in% c("c4", "c10")),
+    has_gap     = any(grepl("^gap_", type)),
+    class = case_when(
+      only_D4Z4 & !has_gap ~ "pure_D4Z4_array",
+      TRUE                 ~ "D4Z4_with_flanks_or_insert"
+    ),
+    .groups = "drop"
+  )
+
+# insert gap-regions
+D4Z4_RU_order <- D4Z4_RU_with_gaps %>%
+  filter(!is.na(type)) %>%
+  arrange(read.id, qstart) %>%
+  group_by(read.id) %>%
+  summarise(
+    repeat_sequence = paste(type, collapse = " - "),
+    .groups = "drop"
+  )
+
 
 # implement repeat-sequence
 D4Z4_onlysort <- as.data.frame(D4Z4_onlysort) %>%
-  left_join(D4Z4_RU_order, by = c("read.id"))
+  left_join(D4Z4_RU_order, by = c("read.id")) %>%
+  left_join(read_class, by = c("read.id"))
+
 
 # count c4/c10 per read  
 D4Z4_onlysort <- D4Z4_onlysort %>%
@@ -360,6 +488,7 @@ D4Z4_onlysort <- D4Z4_onlysort %>%
     c4_count = lengths(regmatches(repeat_sequence, gregexpr("\\bc4\\b", repeat_sequence))),
     c10_count = lengths(regmatches(repeat_sequence, gregexpr("\\bc10\\b", repeat_sequence))),
     chr_assignment = case_when(
+      class != "pure_D4Z4_array" ~ "none",
       c4_count > c10_count ~ "chr4",
       c10_count > c4_count ~ "chr10",
       c4_count > 0 & c4_count == c10_count ~ "mixed",
@@ -387,6 +516,21 @@ D4Z4_mixed <- D4Z4_onlysort %>%
 mixed_max <- max(pmax(D4Z4_mixed$c4_count, D4Z4_mixed$c10_count, na.rm = TRUE))
 D4Z4_mixed_max <- sprintf("mixed (max %s RU)", mixed_max)
 
+D4Z4_false <- D4Z4_onlysort %>%
+  filter(chr_assignment == "none")
+
+D4Z4_onlysort <- D4Z4_onlysort %>%
+  select(
+    -any_of(c(
+      "only_D4Z4", "has_gap",
+      "pLAM_4qB_low_pid", "B_pLAM_4qB",
+      "A_D4F104S1_4qA", "A_pLAM_4qA",
+      "B_D4F104S1_4qB", "B_pLAM_4qB",
+      "CLUHP4_201_exon1", "DUX4_end",
+      "c10_D4F104S1_10qA", "c10_pLAM", "c10_ctrl",
+      "c4_ctrl", "no_chr4_hit"
+    ))
+  )
 
 # create repeat-order
 
@@ -394,7 +538,7 @@ matfilt2 <- data.frame(matfilt_final)
 matsub <- matsub_final
 
 
-## chr10
+# chr10
 
 chr10 <- matfilt2 %>%
   filter(c10_D4F104S1_10qA != "NULL" | (if_all(any_of(c("c10_pLAM")))) != "NULL") %>%
@@ -424,7 +568,7 @@ chr10_complete <- chr10_complete %>%
   mutate(status = "complete") %>%
   relocate(status, .before = repeat_sequence)
 
-## chr4
+# chr4
 
 chr4 <- matfilt2 %>%
   filter(A_D4F104S1_4qA != "NULL" | (if_all(any_of(c("A_pLAM_4qA")))) != "NULL" | if_all(any_of(c("B_pLAM_4qB"))) != "NULL" | if_all(any_of(c("pLAM_4qB_low_pid"))) != "NULL") %>%
@@ -437,7 +581,7 @@ chr4 <- chr4[order(chr4$RU_count, decreasing = TRUE),]
 #chr4$c10_D4Z4 <- NULL
 
 
-#chr4: Filter the 4qA Haplotypes
+# chr4: filter the 4qA haplotypes
 
 A_4qA <- chr4 %>%
   filter((if_all(any_of(c("A_pLAM_4qA")))) > (if_all(any_of(c("c10_pLAM")))) | A_D4F104S1_4qA > pmax(B_D4F104S1_4qB, c10_D4F104S1_10qA, na.rm = TRUE)) %>%
@@ -478,7 +622,7 @@ A_4qA_complete <- A_4qA_complete %>%
   relocate(S_or_L, .before = repeat_sequence) %>%
   relocate(status, .after = S_or_L)  
     
-#chr4: Filter the 4qB Haplotypes
+# chr4: Filter the 4qB haplotypes
 
 
 B_4qB <- chr4 %>%
@@ -525,7 +669,7 @@ chr4_undefined_complete <- chr4_undefined_complete %>%
 
 
 
-## check for CHIMERIC reads:
+# check for CHIMERIC reads:  
 
 chimeric_reads <- bind_rows(A_4qA_complete, chr10_complete, B_4qB_complete, chr4_undefined_complete)
 
@@ -614,37 +758,37 @@ chimeric_reads <- chimeric_reads %>%
     count_c4 = lengths(regmatches(repeat_sequence, gregexpr("\\bc4(S|L)?\\b", repeat_sequence))),
     count_c10 = lengths(regmatches(repeat_sequence, gregexpr("\\bc10\\b", repeat_sequence))),
     warning = case_when(
-      # Original rule for chr4-Read
+      # original rule for chr4-Read
       D4F104S1_type == "10qA" & 
         (!is.na(c4_ctrl) | !is.na(pLAM_4qB_low_pid)) ~ 
-        "very likely chr4-read and not chimeric as chr4_identifier (pLAM_4qB_low_pid and/or c4_ctrl) were detected.",
+        "chr4-read as chr4_identifier (pLAM_4qB_low_pid and/or c4_ctrl) were detected.",
       
       D4F104S1_type %in% c("4qA", "4qB") & 
         pLAM_type == "10qA" & 
         grepl("no_chr4_hit", repeat_sequence) & grepl("c10_ctrl", repeat_sequence) ~ 
-        "very likely chr10-read and not chimeric as chr10-identifier (c10_ctrl) and lack of chr4 hit (no_chr4_hit) were both detected.",
+        "chr10-read as chr10-identifier (c10_ctrl) and lack of chr4 hit (no_chr4_hit) were both detected.",
       
-      # Original rule for chr10-Read
+      # original rule for chr10-Read
       D4F104S1_type %in% c("4qA", "4qB") & 
         pLAM_type == "10qA" & 
         grepl("c10_ctrl", repeat_sequence) ~ 
-        "very likely chr10-read and not chimeric as a chr10-identifier was detected.",
+        "chr10-read as a chr10-identifier was detected.",
       
-      # Original rule for chr10-Read
+      # original rule for chr10-Read
       D4F104S1_type %in% c("4qA", "4qB") & 
         pLAM_type == "10qA" & 
         grepl("no_chr4_hit", repeat_sequence) ~ 
-        "possibly chr10-read and not chimeric as no chr4-identifier was detected on the position (with 1000bp tolerance), marked by no_chr4_hit",
+        "possibly chr10-read as no chr4-identifier was detected on the position (with 1000bp tolerance), marked by no_chr4_hit",
       
-      # Wenn D4F104S1_type == 10qA und nur c4-Repeats vorkommen
+      # when D4F104S1_type == 10qA and only c4-repeats 
       D4F104S1_type == "10qA" &
         count_c4 > 0 & count_c10 == 0 ~ 
-        "possibly chr4-read and not chimeric as only chr4_D4Z4 were detected. Check for possible 10A/BT haplotype (non-standard-chromosome.",
+        "possibly chr4-read as only chr4_D4Z4 were detected. Attention: also chr10 haplotypes (10AT) with c4_D4Z4 possible.",
       
-      # Wenn D4F104S1_type == 4qA oder 4qB und nur c10-Repeats vorkommen
+      # when D4F104S1_type == 4qA or 4qB and only c10-repeats
       D4F104S1_type %in% c("4qA", "4qB") &
         count_c10 > 0 & count_c4 == 0 ~ 
-        "possibly chr10-read and not chimeric as only chr10_D4Z4 were detected.",
+        "possibly chr10-read as only chr10_D4Z4 were detected.",
       
       TRUE ~ NA_character_
     )
@@ -852,6 +996,8 @@ cat('complete reads: reads which include a complete D4Z4-repeat-array with proxi
 cat('\n')
 cat('partial reads: reads which include a partial repeat-array with either the proximal or distal end. Therefore the reads only reach into the array either from the proximal or distal side.')
 cat('\n')
+cat('RU - repeat-units.')
+cat('\n')
 cat('\n')
 cat('\n')
 cat('____________________________')
@@ -900,31 +1046,46 @@ cat('____________________________')
 
 cat('\n')
 cat('\n')
-cat('Chimeric reads:')
+cat('Chimeric reads: Translocation')
 cat('\n')
+cat('\n')
+cat('Detection of possible sub-haplotypes or translocations between chr4 and chr10.')
 cat('\n')
 cat('Shows haplotype for proximal (D4F104S1) and distal (pLAM) end of the D4Z4-array of the chimeric reads.')
 cat('\n')
 cat('Attention: There are sub-haplotypes for 4qA/4qB which are nearly not distinguishable in their proximal-front (D4F104S1) region from chr10.')
 cat('\n')
-cat('The tool recognizes chr4-markers applied into the blast-workflow and gives warnings if chimeric reads might belong to a rare haplotype.')
+cat('Therefore some sub-haplotypes of 4qA/4qB have a proximal chr10 D4F104S1 and need to be further evaluated (f.ex. by SSLP-analysis).')
+cat('\n')
+cat('The tool recognizes chr4-markers applied into the blast-workflow and gives warnings if chimeric reads might belong to chr4.')
 cat('\n')
 cat('\n')
 write.csv2(chimeric_repeat_order, row.names = FALSE)
 cat('\n')
 cat('\n')
-cat('ATTENTION: Please further investigate ambiguous reads to confirm the correct chromosome and allele (f.ex. SSLP-polymorphism)!')
+cat('4qA-subhaplotypes not distinguishable in their proximal-front (D4F104S1) region from chr10 (c10_D4F104S1 hit): 4A166 (not permissive), 4A166H, 4A168, but distinguishable from the distal 4qA-pLAM.')
 cat('\n')
-cat('4qA-sub-haplotypes not distinguishable in their proximal-front (D4F104S1) region from chr10: 4A166 (not permissive), 4A166H, 4A168, but distinguishable from the distal 4qA-pLAM.')
+cat('4qB-subhaplotypes not distinguishable in their proximal-front (D4F104S1) region from chr10 (c10_D4F104S1 hit): 4B162, 4B168, 4B170H. But well distinguishable from the distal 4qB-pLAM.')
 cat('\n')
-cat('4qB-sub-haplotypes not distinguishable in their proximal-front (D4F104S1) region from chr10: 4B162, 4B168, 4B170H. But well distinguishable from the distal 4qB-pLAM.')
+cat('F.ex. if a 4qA-pLAM is available with a 10qA-D4F104S1 and may contain chr4_D4Z4 RU mixed with chr10_D4Z4 RU, it can be either a 10qA or 4qA sub-haplotype. SSLP-Sequence should be examined for: 4A166 (non-permissive), 4A166H, 4A168.')
+cat('\n')
+cat('F.ex. if a 4qA-pLAM is available with a 10qA-D4F104S1 and also contains chr4 indicators pLAM_4qB_low_pid and/or c4_ctrl before D4F104S1 and contains chr4_D4Z4 (may be mixed with chr10_D4Z4), it is very likely a 4qA-read belonging to a 4qA sub-haplotype: 4A166 (non-permissive), 4A166H, 4A168.')
+cat('\n')
+cat('F.ex. if a 4qB/4qA-pLAM is available with a 10qA-D4F104S1 and contains chr10 indicators no_chr4_hit and/or c10_ctrl before D4F104S1 and contains chr4_D4Z4 RU, it is likely a 10q-read belonging to a 10qA sub-haplotype: 10A176T, 10A180T')
+cat('\n')
+cat('4B161: chr4-markers (pLAM_4qB_low_pid/c4_ctrl) + 4qA_D4F104S1 + c4_D4Z4 + 4qB-pLAM --> 4qB sub-haplotype 4B161.')
+cat('\n')
+cat('10B161T: 4qB-hit, chr10 indicators (c10_ctrl/no_chr4_hit) + 4qB_D4F104S1 + c4_D4Z4 + 4qB-pLAM --> chr10 sub-haplotype 10B161T.')
+cat('\n')
+cat('ATTENTION: Please further investigate ambiguous reads to confirm the correct chromosome and allele (f.ex. SSLP-repeat)!')
+cat('\n')
 cat('\n')
 cat('\n')
 cat('\n')
 cat('____________________________')
 cat('\n')
 cat('\n')
-cat('DUCKS4 - Version 2.1.0')
+cat('DUCKS4 - Version 1')
 
 sink()
 
@@ -960,10 +1121,6 @@ pas <- basename(args[2])
 target <- file.path(output_dir, basename(pas))
 file.rename(pas, target)
 
-
-#################################################################################################################################
-####                 FINISH :)             #####
-#################################################################################################################################
 
 
 

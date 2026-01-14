@@ -1,0 +1,8 @@
+Homo_sapiens_GRCh38_no_alt reference files are taken from
+
+https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/
+
+Original files:
+
+GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.fai                             2014-11-18 15:56  7.6K  
+GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz                              2014-01-11 09:09  833M  

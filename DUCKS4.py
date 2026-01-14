@@ -2,7 +2,7 @@ import os, subprocess, time, shutil, sys
 from argparse import ArgumentParser
 from pprint import pprint
 
-VERSION = "2.1.0"
+VERSION = "1.0"
 
 # Implement ArgParser
 parser = ArgumentParser(
@@ -14,8 +14,8 @@ parser = ArgumentParser(
 )
 parser.add_argument("--input", dest="finput", help="Choose .fasta, .fastq, .fastq.gz or .ubam/.bam input file. Best to simply start with your SUP-ubam file from basecalling.", required=True)
 parser.add_argument("--methyl", dest="methyl", help="Optional methylation calculation for all 4qA-reads with modkit", required=False, action='store_true')
-parser.add_argument("--threads", dest="threads", help="Set your amount of threads. Default is 45", default="45", required=False)
 parser.add_argument("--variant", dest="variant", help="Activate variant calling with clair3 & sniffles2", required=False, action='store_true')
+parser.add_argument("--threads", dest="threads", help="Set your amount of threads. Default is 45", default="45", required=False)
 parser.add_argument("--version", action="version", version=f"DUCKS4 {VERSION}")
 
 parser.set_defaults(methyl=False)
@@ -54,7 +54,6 @@ def main():
     print("####   DUCKS4   ####")
     print("       ")
     print("DUCKS4 - a comprehensive FSHD-analysis pipeline for long-reads.")
-    print("DUCKS4 v2.0")
     print("       ")
     print("See --help for more infos.")
     print("The whole workflow is based on T2T-chm13v2.0.")
@@ -167,7 +166,7 @@ def main():
     
     def minimap2(file):
       print("       ")
-      print("Mapping with Minimap2:")
+      print("Aligning with Minimap2:")
       print("       ")
       file_in = os.path.basename(file)
       path = os.path.dirname(file)
@@ -181,16 +180,16 @@ def main():
     
     def minimap2_hg38(file):
       print("       ")
-      print("Mapping with Minimap2:")
+      print("Aligning with Minimap2:")
       print("       ")
       file_in = os.path.basename(file)
       path = os.path.dirname(file)
       ref_path = os.path.join(script_path, "ressources","reference", '')
       sam_file = ''.join([file_in.split('.')[0], "_HG38.sam"])
       if args.threads:
-        subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", args.threads, "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "Homo_sapiens_GRCh38_no_alt.fasta"), os.path.join(path, file_in)])
+        subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", args.threads, "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "hg38_no_alt.fa"), os.path.join(path, file_in)])
       else:
-        subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "Homo_sapiens_GRCh38_no_alt.fasta"), os.path.join(path, file_in)])
+        subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "hg38_no_alt.fa"), os.path.join(path, file_in)])
       return sam_file
     
     def samtools_bam(sam_input):
@@ -216,7 +215,7 @@ def main():
       ID_file = os.path.basename(ID)
       path = os.path.dirname(ID)
       print("       ")
-      print("Filtering haplotypes and complete reads and mapping to T2T-chm13v2.0. for ID ", ID_file)
+      print("Filtering haplotypes and complete reads and aligning to T2T-chm13v2.0. for ID ", ID_file)
       print("       ")
       file_size = os.path.getsize((os.path.join(path, ID_file)))
       if file_size == 0:
@@ -261,7 +260,7 @@ def main():
     print("       ")
     
     
-    ## map reads
+    ## align reads
     
     map_file = checkfile_fastq(os.path.join(path_sample, fastq_file))
     sam_map = minimap2(map_file)
@@ -367,20 +366,25 @@ def main():
       ref_path = os.path.join(script_path, "ressources","reference", '')
       varscript = os.path.join(ducks4_path, "FSHD_variant.py")
       
-      print("Map to HG38 for variant calling and annotation.")
+      print("Align to HG38 for variant calling and annotation.")
       sam_map = minimap2_hg38(map_file)
       bam_map_hg38 = samtools_bam(os.path.join(path_sample, sam_map))
       
+      print("       ")
+      print("Variant calling:")
+      print("       ")
       if args.threads:
         subprocess.run(["/opt/conda/bin/conda", "run", "-n", "clair3", "/usr/bin/python3", varscript, os.path.join(path_sample, bam_map_hg38), FSHD_path, ref_path, os.path.join(path_sample, bam_map), str(args.threads)])
       else:
         subprocess.run(["/opt/conda/bin/conda", "run", "-n", "clair3", "/usr/bin/python3", varscript, os.path.join(path_sample, bam_map_hg38), FSHD_path, ref_path, os.path.join(path_sample, bam_map)])
-
+      
+      subprocess.call(["rm", os.path.join(path_sample, bam_map_hg38)])
+      bai_file = ''.join([bam_map_hg38.split('.')[0], ".bam.bai"])
+      subprocess.call(["rm", os.path.join(path_sample, bai_file)])
     
     subprocess.call(["chown", "-R", "777", FSHD_path])
 
-    print("       ")
-    print("####   DUCKS4   ####")
+
     print("       ")
     print("Workflow is finished. Thank you for using this pipeline. :-) TL.")
     print("       ")

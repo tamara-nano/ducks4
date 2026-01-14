@@ -1,6 +1,7 @@
 
 import os, subprocess, time, shutil, sys
 import csv, re
+from datetime import datetime
 
 script_path = os.path.abspath(os.path.dirname( __file__ ))
 
@@ -11,7 +12,7 @@ def main():
     print(f"bam file used for variant calling with clair3 & sniffles2: {input_file}")
     FSHD_path = sys.argv[2]
     ref_path = sys.argv[3]
-    reference = os.path.join(ref_path, "Homo_sapiens_GRCh38_no_alt.fasta")
+    reference = os.path.join(ref_path, "hg38_no_alt.fa")
     bam_t2t = sys.argv[4]
     if len(sys.argv) > 5:
       threads = sys.argv[5]
@@ -92,12 +93,12 @@ def main():
             "java", "-Xmx1g", "-jar",
             os.path.join(script_path, "snpEff/SnpSift.jar"),
             "annotate", "-v",
-            os.path.join(script_path, "snpEff/clinvar_20250729.vcf.gz"),
+            os.path.join(script_path, "snpEff/clinvar_hg38.vcf.gz"),
             os.path.join(clair3_path, vcf_phase_annot_filegz)
         ], stdout=fsf)
     
     # Compress and index annotated VCF
-    vcf_phase_annot_filegz2 = "phased_merge_HG38_Clinvar.vcf.gz"
+    vcf_phase_annot_filegz2 = "phased_merge_HG38_snpeff-clinvar.vcf.gz"
     with open(os.path.join(clair3_path, vcf_phase_annot_filegz2), "wb") as fsf:
         subprocess.call([
             "bgzip", "-c",
@@ -108,6 +109,7 @@ def main():
         "tabix", "-p", "vcf",
         os.path.join(clair3_path, vcf_phase_annot_filegz2)
     ])
+    
     
     # Filter for FSHD-relevant SNVs
     print("Filtering for FSHD-relevant SNVs...")
@@ -129,56 +131,18 @@ def main():
             "filter", fshd_filter,
             os.path.join(clair3_path, vcf_phase_annot_filegz2)
         ], stdout=fsf, check=True)
-    
-    # Convert filtered VCF to TSV
-    print("Creating TSV table from FSHD-relevant SNVs...")
-    fshd_tsv = os.path.join(clair3_path, "fshd_relevant.tsv")
-    
 
+    filter_txt = os.path.join(clair3_path, "fshd_relevant.filter.txt")
 
-    
-    def parse_ann_field(ann_field):
-        """Parse ANN= field from snpEff annotation."""
-        ann_entries = []
-        for ann in ann_field.split(","):
-            parts = ann.split("|")
-            if len(parts) > 4:
-                ann_entries.append({
-                    "effect": parts[1],
-                    "impact": parts[2],
-                    "gene": parts[3],
-                    "gene_id": parts[4]
-                })
-        return ann_entries
-    
-    def get_info_value(info_str, key):
-        match = re.search(rf"{re.escape(key)}=([^;]+)", info_str)
-        return match.group(1) if match else ""
-    
-    with open(fshd_vcf) as vcf, open(fshd_tsv, "w", newline="") as out:
-        writer = csv.writer(out, delimiter="\t")
-        writer.writerow(["CHROM", "POS", "REF", "ALT", "GENE", "EFFECT", "IMPACT", "CLNSIG", "CLNDN"])
-    
-        for line in vcf:
-            if line.startswith("#"):
-                continue
-            fields = line.strip().split("\t")
-            chrom, pos, _id, ref, alt, _qual, _filter, info = fields[:8]
-    
-            ann_field = get_info_value(info, "ANN")
-            clnsig = get_info_value(info, "CLNSIG")
-            clndbn = get_info_value(info, "CLNDN")
-    
-            ann_entries = parse_ann_field(ann_field)
-            for ann in ann_entries:
-                writer.writerow([
-                    chrom, pos, ref, alt,
-                    ann["gene"], ann["effect"], ann["impact"],
-                    clnsig, clndbn
-                ])
-    
-    print(f"[INFO] FSHD-relevant VCF saved to: {fshd_vcf}")
-    print(f"[INFO] FSHD-relevant TSV saved to: {fshd_tsv}")
+    with open(filter_txt, "w", encoding="utf-8") as fh:
+        fh.write("DUCKS4 / FSHD variant filter (SnpSift)\n")
+        fh.write(f"Created: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+        fh.write(f"Output VCF: {os.path.basename(fshd_vcf)}\n\n")
+        fh.write("Filter expression:\n")
+        fh.write(fshd_filter + "\n")
+        
+        print(f"[INFO] FSHD-relevant VCF saved to: {fshd_vcf}")
+
 
 
 

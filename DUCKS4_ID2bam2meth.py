@@ -1,325 +1,528 @@
-import os, subprocess, time, shutil, sys
-from argparse import ArgumentParser
+#!/usr/bin/env python3
+import argparse
+import csv
+import subprocess
+import sys
+import os, time, shutil
+from pathlib import Path
 from pprint import pprint
 
-
-parser = ArgumentParser(
-    description="""
-    DUCKS4 - ID2bam2meth
-
-    This script allows bundling of selected read IDs from DUCKS4 output
-    for methylation analysis and BAM extraction using reference genome T2T-chm13v2.0. Also an alternative reference can be used.
-    """
-)
-parser.add_argument("--txt", dest="tinput", help="required, read_id.txt, Copy the read IDs you want to bundle from the analysis files into a .txt file and give it to me :)", required=True)
-parser.add_argument("--bam", dest="binput", help="required, provide mapped & sorted .bam file (e.g. from DUCKS4-output) for reference T2T-chm13v2.0. If you want to use another ref. Please add flag --ref", required=True)
-parser.add_argument("--ref", dest="ref", help="optional, custom reference .fasta. Default is T2T_chm13v2.0.", required=False)
-parser.add_argument("--methyl", dest="methyl", help="optional, perform methylation calling on selected reads.", required=False, action='store_true')
-parser.add_argument("--region", dest="region", help=" optional, enomic region (e.g. chr1:1-100). REQUIRED if --ref & --methyl are set. Default for T2T_chm13v2.0 ref (when no --ref is given) = chr4:193540172-193543634 (2 most distal RU + gene-body).", required=False)
-parser.add_argument("--threads", dest="threads", help="optional. Set your amount of threads. Default is 45", default="45", required=False)
-
-parser.set_defaults(methyl=False)
+import pysam
 
 
-args = parser.parse_args()
-
-if args.ref and args.methyl and not args.region:
-    print("Error: --region is required when --ref and --methyl are given.")
-    sys.exit(1)
-    
-txt_path = os.path.dirname(args.tinput)
-txt_name = os.path.basename(args.tinput).split('.')[0]
-txt_file = os.path.basename(args.tinput)
-
-bam_path = os.path.dirname(args.binput)
-bam_name = os.path.basename(args.binput).split('.')[0]
-bam_file = os.path.basename(args.binput)
-
-script_path = os.path.abspath(os.path.dirname( __file__ ))
+def reverse_complement(seq: str) -> str:
+    comp = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+    return seq.translate(comp)[::-1]
 
 
-def main():
+def get_read_sequence(bam_path, read_id):
+    bam = pysam.AlignmentFile(str(bam_path), "rb", check_sq=False)
+    seq = None
+    is_reverse = False
+    read_len = None
+    for aln in bam.fetch(until_eof=True):
+        if aln.query_name != read_id:
+            continue
+        # Prefer primary, non-supplementary alignment
+        if not aln.is_secondary and not aln.is_supplementary:
+            seq = aln.query_sequence
+            is_reverse = aln.is_reverse
+            read_len = aln.query_length
+            is_unmapped = aln.is_unmapped
+            break
+        # take first hit if no primary is found
+        if seq is None:
+            seq = aln.query_sequence
+            is_reverse = aln.is_reverse
+            read_len = aln.query_length
+            is_unmapped = aln.is_unmapped
+    bam.close()
+    if seq is None:
+        raise ValueError(f"Read ID '{read_id}' not found in {bam_path}")
+    return seq, is_reverse, read_len, is_unmapped
 
-    print("       ")
-    print("####   DUCKS4 - IDtobamtometh   ####")
-    print("       ")
-    print("DUCKS4 - Filter and map your read-ID.txt files from a bam alignment, and optional methylation basecalling.")
-    print("       ")
-    print("See --help for more infos.")
-    print("The whole workflow is based on T2T-chm13v2.0 but other reference can be used.")
-    print("Code written and adapted by TL :-)")
-    print("       ")
-    
-    
-    def checkfile_fastq(file_in):
-      file_out = file_in.rsplit('.', 1)[0] + '.fastq'
-      if file_in.endswith('bam'):
+
+
+def write_fasta(read_id, sequence, fasta_path):
+    with open(fasta_path, "w") as fh:
+        fh.write(f">{read_id}\n")
+        for i in range(0, len(sequence), 60):
+            fh.write(sequence[i:i + 60] + "\n")
+
+
+def index_fasta_with_samtools(fasta_path):
+    try:
+        subprocess.run(["samtools", "faidx", str(fasta_path)], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: samtools faidx failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def parse_blast_to_bed(blast_path, target_read_id, bed_path, read_len, flipped):
+    hits = {}
+    with open(blast_path) as fh:
+        first = fh.readline().rstrip("\n")
+        if not first:
+            raise ValueError(f"BLAST file {blast_path} is empty")
+        has_header = first.lower().startswith("read.id") or first.lower().startswith('"read.id"')
+        # delimiter detection
+        if "\t" in first:
+            delim = "\t"
+        elif ";" in first:
+            delim = ";"
+        elif "," in first:
+            delim = ","
+        else:
+            delim = "\t"
+        fh.seek(0)
+        if has_header:
+            # headered CSV/TSV 
+            reader = csv.reader(fh, delimiter=delim)
+            header = next(reader)
+            header = [h.strip().strip('"') for h in header]
+            required = ["read.id", "region", "percent.identity", "qstart", "qend"]
+            missing = [c for c in required if c not in header]
+            if missing:
+                raise ValueError(
+                    f"BLAST file missing required columns: {', '.join(missing)}\n"
+                    f"Found columns: {header}"
+                )
+            idx = {name: header.index(name) for name in header}
+            for cols in reader:
+                if not cols:
+                    continue
+                # pad short lines
+                if len(cols) < len(header):
+                    cols = cols + [""] * (len(header) - len(cols))
+                read_id = cols[idx["read.id"]].strip()
+                if read_id != target_read_id:
+                    continue
+                region = cols[idx["region"]].strip().rstrip(".")
+                pid_str = cols[idx["percent.identity"]].replace(",", ".")
+                try:
+                    pid = float(pid_str)
+                except ValueError:
+                    continue
+                qstart = int(cols[idx["qstart"]])
+                qend = int(cols[idx["qend"]])
+                # Transform coordinates for flipped reads
+                if flipped:
+                    # original BLAST coords are 1-based on the unflipped read
+                    qstart_new = read_len - qend + 1
+                    qend_new = read_len - qstart + 1
+                    qstart, qend = qstart_new, qend_new
+
+                start = min(qstart, qend) - 1  
+                end = max(qstart, qend)        
+                key = (start, end)
+                best = hits.get(key)
+                if best is None or pid > best["pid"]:
+                    hits[key] = {"pid": pid, "region": region}
+        else:
+            # headerless BLAST outfmt 6 
+            # "read-id", "region", "percent-identity", "region-length", "length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send", "e-value", "bitscore"
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # whitespace split 
+                cols = line.split()
+                if len(cols) < 12:
+                    continue
+                qseqid = cols[0].strip()
+                if qseqid != target_read_id:
+                    continue
+                sseqid  = cols[1]
+                pident  = cols[2]
+                qstart  = cols[7]
+                qend    = cols[8]
+                region = sseqid.strip().rstrip(".")
+                pid = float(pident.replace(",", "."))
+                qstart = int(qstart)
+                qend   = int(qend)
+                # If flipped, transform the coordinates on the flipped FASTA
+                if flipped:
+                    # if coords exceed read_len, something is wrong; skip
+                    if qstart > read_len or qend > read_len:
+                        continue
+                    qstart_new = read_len - qend + 1
+                    qend_new   = read_len - qstart + 1
+                    qstart, qend = qstart_new, qend_new
+                start = min(qstart, qend) - 1
+                end   = max(qstart, qend)
+                key = (start, end)
+                best = hits.get(key)
+                if best is None or pid > best["pid"]:
+                    hits[key] = {"pid": pid, "region": region}
+    if not hits:
+        raise ValueError(f"No BLAST hits found for read {target_read_id} in {blast_path}")
+    with open(bed_path, "w") as out:
+        for (start, end) in sorted(hits.keys()):
+            out.write(f"{target_read_id}\t{start}\t{end}\t{hits[(start,end)]['region']}\n")
+
+
+def checkfile_fastq(file_in):
+    file_out = file_in.rsplit('.', 1)[0] + '.fastq'
+    if file_in.endswith('bam'):
         print(".bam-file is being converted to .fastq-file with samtools.")
         print("       ")
-        file_out = file_in.rsplit('.', 1)[0] + '.fastq'
         try:
-          with open(file_out, 'w') as out_f:
-            result = subprocess.run(['samtools', 'fastq', '-T', '*', file_in], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-          print(f"The file was successfully converted to {file_out}.")
-          if result.stderr:
-            print(f"{result.stderr}")
+            with open(file_out, 'w') as out_f:
+                result = subprocess.run(
+                    ['samtools', 'fastq', '-T', '*', file_in],
+                    check=True, text=True, stdout=out_f, stderr=subprocess.PIPE
+                )
+            print(f"The file was successfully converted to {file_out}.")
+            if result.stderr:
+                print(f"{result.stderr}")
         except subprocess.CalledProcessError as e:
-          print(f"Error while converting the file: {e}")
-          print(f"{e.stderr}")
-          return None
-      elif file_in.endswith('gz'):
+            print(f"Error while converting the file: {e}")
+            print(f"{e.stderr}")
+            return None
+    elif file_in.endswith('gz'):
         print(".fastq.gz-file is being unzipped.")
         print("       ")
         try:
-          with open(file_out, 'w') as out_f:
-            result = subprocess.run(['gunzip', '-c', file_in], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-          print(f"The file was successfully converted to {file_out}.")
-          if result.stderr:
-            print(f"{result.stderr}")
+            with open(file_out, 'w') as out_f:
+                result = subprocess.run(
+                    ['gunzip', '-c', file_in],
+                    check=True, text=True, stdout=out_f, stderr=subprocess.PIPE
+                )
+            print(f"The file was successfully converted to {file_out}.")
+            if result.stderr:
+                print(f"Standardfehlerausgabe: {result.stderr}")
         except subprocess.CalledProcessError as e:
-          print(f"Error while converting file: {e}")
-          return None
-      elif file_in.endswith('fastq'):
-        file_in = file_out
-      elif file_in.endswith('fasta'):
-        file_in = file_out
-      elif file_in.endswith('fa'):
-        file_in = file_out
-      else:
-        print(f"This file-format is not supported!")
-        return None
-      return file_out
-    
-    def checkfile_fasta(file_in):
-      # Test, if file exists:
-      file_out = file_in.rsplit('.', 1)[0] + '.fasta'
-      if not os.path.isfile(file_in):
-        raise FileNotFoundError(f"The file {file_in} was not found.")
-      if file_in.endswith('bam'):
-        print("       ")
-        print(".bam-file is being converted to .fasta-file with samtools.")
-        print("       ")
-        file_out = file_in.rsplit('.', 1)[0] + '.fasta'
-        try:
-          with open(file_out, 'w') as out_f:
-            result = subprocess.run(['samtools', 'fasta', file_in], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-          print(f"The file was successfully converted to {file_out}.")
-          if result.stderr:
-            print(f"{result.stderr}")
-        except subprocess.CalledProcessError as e:
-          print(f"Error while converting the file: {e}")
-          print(f"{e.stderr}")
-          return None
-      elif file_in.endswith('gz'):
-        print("       ")
-        print(".fastq.gz-file is being converted to .fasta-file with seqtk.")
-        print("       ")
-        try:
-          with open(file_out, 'w') as out_f:
-            result = subprocess.run(['seqtk', 'seq', '-a', file_in], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-          print(f"The file was successfully converted to {file_out}.")
-          if result.stderr:
-            print(f"{result.stderr}")
-        except subprocess.CalledProcessError as e:
-          print(f"Errer while converting the file: {e}")
-          print(f"{e.stderr}")
-          return None
-      elif file_in.endswith('fastq'):
-        print("       ")
-        print(".fastq-file is being converted to .fasta-file with seqtk.")
-        print("       ")
-        try:
-          with open(file_out, 'w') as out_f:
-            result = subprocess.run(['seqtk', 'seq', '-a', file_in], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-          print(f"The file was successfully converted to {file_out}.")
-          if result.stderr:
-            print(f"{result.stderr}")
-        except subprocess.CalledProcessError as e:
-          print(f"Error while converting the file: {e}")
-          print(f"{e.stderr}")
-          return None
-      elif file_in.endswith('fasta'):
-        print("       ")
-        print(".fasta-file recognized, continue with Blast.")
-        print("       ")
+            print(f"Fehler bei der Umwandlung der Datei: {e}")
+            print(f"Standardfehlerausgabe: {e.stderr}")
+            return None
+    elif file_in.endswith('fastq'):
         file_out = file_in
-      elif file_in.endswith('fa'):
-        print("       ")
-        print(".fasta-file recognized, continue with Blast.")
-        print("       ")
-        file_out = file_in
-      else:
-        print(f"This file-format is not supported!")
+    else:
+        print("This file-format is not supported!")
         return None
-      return file_out
-    
-    def minimap2(file):
-      print("       ")
-      print("Mapping with Minimap2:")
-      print("       ")
-      file_in = os.path.basename(file)
-      path = os.path.dirname(file)
-      ref_path = os.path.join(script_path, "ressources","reference", '')
-      sam_file = ''.join([file_in.split('.')[0], "_T2Tchm13v2.sam"])
-      if args.threads:
-        if args.ref:
-          ref_name = os.path.basename(args.ref).split('.')[0]
-          sam_file = ''.join([file_in.split('.')[0], "_", ref_name, ".sam"])
-          subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", args.threads, "-Y", "-y", "-o", os.path.join(path, sam_file), args.ref, os.path.join(path, file_in)])
-        else:
-          sam_file = ''.join([file_in.split('.')[0], "_T2Tchm13v2.sam"])
-          subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", args.threads, "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "chm13v2.0.fa"), os.path.join(path, file_in)])
-      else:
-        if args.ref:
-          ref_name = os.path.basename(args.ref).split('.')[0]
-          sam_file = ''.join([file_in.split('.')[0], "_", ref_name, ".sam"])
-          subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), args.ref, os.path.join(path, file_in)])
-        else:
-          sam_file = ''.join([file_in.split('.')[0], "_T2Tchm13v2.sam"])
-          subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "chm13v2.0.fa"), os.path.join(path, file_in)])
-      return sam_file 
-    
-    def samtools_bam(sam_input):
-      print("       ")
-      print("Sorting and indexing of .sam-file:")
-      print("       ")
-      sam_file = os.path.basename(sam_input)
-      path = os.path.dirname(sam_input)
-      bam_file = ''.join([sam_file.split('.')[0], ".bam"])
-      if args.threads:
-        thread = ''.join(["-@", args.threads])
-        subprocess.call(["samtools", "view", thread, "-S", "-b", os.path.join(path, sam_file), "-o", os.path.join(path, bam_file)])
-        subprocess.call(["samtools", "sort", "-m", "15G", "-o", os.path.join(path, bam_file), os.path.join(path, sam_file)])
-      else:
-        subprocess.call(["samtools", "view", "-@45", "-S", "-b", os.path.join(path, sam_file), "-o", os.path.join(path, bam_file)])
-        subprocess.call(["samtools", "sort", "-@16", "-m", "15G", "-o", os.path.join(path, bam_file), os.path.join(path, sam_file)])
-      subprocess.call(["samtools", "index", os.path.join(path, bam_file)])
-      subprocess.call(["rm", os.path.join(path, sam_file)])
-      return bam_file
-
-      
-    def check_ID(ID):
-      ID_file = os.path.basename(ID)
-      path = os.path.dirname(ID)
-      print("       ")
-      print("Filtering haplotypes and complete reads and mapping to T2T-chm13v2.0. for ID ", ID_file)
-      print("       ")
-      file_size = os.path.getsize((os.path.join(path, ID_file)))
-      if file_size == 0:
-        print("No IDs in file ", ID_file, ". Skipped & ID-file deleted.")
-        subprocess.call(["rm", os.path.join(path, ID_file)])
-        return None
-      else:
-        ID_sam = ''.join([file_name, "_", ID_file.split('.')[0], ".sam"]) 
-        ID_bam = ''.join([file_name, "_", ID_file.split('.')[0], ".bam"])
-        fsf = open(os.path.join(path, ID_bam), "w")
-        subprocess.call(['samtools', 'view',  '-h', '-N', os.path.join(path, ID_file), os.path.join(path_sample, bam_map)], stdout = fsf)
-        fsf.close()
-        fastq = checkfile_fastq(os.path.join(path, ID_bam))
-        subprocess.call(["rm", os.path.join(path, ID_bam)])
-        sam = minimap2(fastq)
-        bam = samtools_bam(os.path.join(path, sam))
-        subprocess.call(["rm", fastq])
-        subprocess.call(["mv", os.path.join(path, ID_file), os.path.join(path, "read-IDs")])
-      return bam
+    return file_out
 
 
-
-
-    ### START WORKFLOW  ###
-    
-    ## Filter reads from bam-alignment
-    
-    print("Filter reads from .bam-alignment")
-    
-    txt_path = os.path.dirname(args.tinput)
-    txt_name = os.path.basename(args.tinput).split('.')[0]
-    txt_file = os.path.basename(args.tinput)
-
-    bam_path = os.path.dirname(args.binput)
-    bam_name = os.path.basename(args.binput).split('.')[0]
-    bam_file = os.path.basename(args.binput)
-    
-    ID_bam = bam_name + '_' + txt_name + '.bam'
-    ID_out = os.path.join(bam_path, ID_bam)
-    try:
-      with open(ID_out, 'w') as out_f:
-        result = subprocess.run(['samtools', 'view', '-h', '-N', args.tinput, args.binput], check=True, text=True, stdout=out_f, stderr=subprocess.PIPE)
-      print(f"The file was successfully converted to {ID_out}.")
-      if result.stderr:
-        print(f"{result.stderr}")
-    except subprocess.CalledProcessError as e:
-      print(f"Error with converting file: {e}")
-      print(f"{e.stderr}")
-      return None
-    
-    map_file = checkfile_fastq(ID_out)
-    sam_map = minimap2(map_file)
-    bam_map = samtools_bam(os.path.join(bam_path, sam_map))
-
-    
-    ## Methylation calculation with modkit
-    
-    if args.methyl:
-      print("       ")    
-      print("Start Methylation-analysis with Modkit.")
-      print("       ")
-      
-      if args.ref:
-        ref_name = os.path.basename(args.ref).split('.')[0]
-        ref_path = os.path.dirname(args.ref)
-        ref_file = os.path.basename(args.ref)
-      else:
-        ref_path = os.path.join(script_path, "ressources","reference")
-        ref_path = str(ref_path)
-      
-      bam_map_name = os.path.basename(bam_map).split('.')[0]
-      meth_path = os.path.join(bam_path, "methylation-analysis")
-      os.mkdir(meth_path)
-      modkit_bed = ''.join([bam_map_name, "_", "modkit-methyl.bed"])   
-      if args.ref:
-        subprocess.call(["modkit", "pileup", os.path.join(bam_path, bam_map), os.path.join(meth_path, modkit_bed), "--cpg", "--ref", args.ref])
-      else:
-        subprocess.call(["modkit", "pileup", os.path.join(bam_path, bam_map), os.path.join(meth_path, modkit_bed), "--cpg", "--ref", os.path.join(ref_path, "chm13v2.0.fa")])
-      modkit_bedgz = ''.join([modkit_bed, ".gz"])
-      subprocess.call(["bgzip", os.path.join(meth_path, modkit_bed)])
-      subprocess.call(["tabix", os.path.join(meth_path, modkit_bedgz)])
-      
-      if args.ref:
-        chrom, coords = args.region.split(":")
-        start, end = map(int, coords.split("-"))
-        bed = ''.join(["coordinates_methcalc.bed"])
-        bed_file = os.path.join(meth_path, bed)
-        with open(bed_file, "w") as f:
-          f.write(f"{chrom}\t{start - 1}\t{end}\n")
-      else:
-        if args.region:
-          chrom, coords = args.region.split(":")
-          start, end = map(int, coords.split("-"))
-          bed = ''.join(["coordinates_methcalc.bed"])
-          bed_file = os.path.join(meth_path, bed)
-          with open(bed_file, "w") as f:
-            f.write(f"{chrom}\t{start - 1}\t{end}\n")
-        else:
-          bed = ''.join(["distal-RU_gene-body_methcalc.bed"])
-          bed_file = os.path.join(meth_path, bed)
-          with open(bed_file, "w") as f:
-            f.write("chr4\t193540172\t193543634\n")
+def main():
+    ap = argparse.ArgumentParser(
+        description="""
+        DUCKS4 - ID2bam2meth 
         
-      modout_all = "modkit-STATS.tsv" 
-      subprocess.call(["modkit", "stats", "--regions", bed_file, "-o", os.path.join(meth_path, modout_all), os.path.join(meth_path, modkit_bedgz)])
+        Please choose for the reference either mode A or B:
+        A) custom reference to be created from a read:
+          --id_ref read-id --bam_ref read.bam --blast_ref blast.tsv/txt
+        B) provide existing reference:
+          --ref ref.fasta
 
-    
-      subprocess.call(["chown", "-R", "777", meth_path])
+        Alignment:
+          --bam reads.bam
+          [--id] read-id.txt   (if --id is omitted, whole bam is aligned. Here you can submit a chosen subset of reads to be filtered from the bam and aligned.)
+        Methyl:
+          --methyl
+            - if custom reference: stats over BED from BLAST
+            - if existing reference: require --region chr:start-end (creates 1-region BED) OR --regions_bed if more regions should be considered
+        """
+    )
 
-    print("       ")
-    print("####   DUCKS4 - ID2bam2meth  ####")
-    print("       ")
-    print("Workflow is finished. Thank you for using this pipeline. :-) TL.")
+    # Reference
+      # ModeA
+    ap.add_argument("--id_ref", required=False, help="Read-id used as custom reference (Mode A).")
+    ap.add_argument("--bam_ref", required=False, help="BAM containing the reference-read (Mode A).")
+    ap.add_argument("--blast_ref", required=False, help="BLAST CSV/TXT for reference-read annotation (folder blast_results) (Mode A).")
+      # ModeB
+    ap.add_argument("--ref", required=False, help="Use an existing reference FASTA (Mode B).")
+
+    # optional reads for alignment
+    ap.add_argument("--bam", required=False, help="Input BAM to extract/align reads against the reference.")
+    ap.add_argument("--txt", required=False, help="Optional read_id.txt to subset reads from --bam to be aligned to reference.")
+
+    # methylation
+    ap.add_argument("--methyl", required=False, action='store_true', help="Run modkit pileup + stats.")
+    ap.add_argument("--region", required=False, help="Required for Mode B: --ref + --methyl. Format: chr:start-end")
+    ap.add_argument("--regions_bed", required=False, help="Optional BED with multiple regions for modkit stats (works for Mode A and B). If set, --region is not needed.")
+
+    # outputs
+    ap.add_argument("--out_prefix", required=False, default=None, help="Prefix name (default: id_ref or ref basename).")
+    ap.add_argument("--out_path", required=False, help="Output directory. Default: created next to BAM.")
+    ap.add_argument("--threads", dest="threads", default="45", required=False, help="Threads (default 45).")
+
+    args = ap.parse_args()
+
     print("       ")
     print("####   DUCKS4 - ID2bam2meth   ####")
     print("       ")
 
+    modeA = bool(args.id_ref and args.bam_ref and args.blast_ref)
+    modeB = bool(args.ref)
+
+    if not modeA and not modeB:
+        print("ERROR: Either choose a read to create a custom reference from it OR give a reference .fasta file.")
+        print("       custom reference needs: --id_ref read-id --bam_ref read.bam --blast_ref blast.tsv/txt from DUCKS4-output (folder blast-results)")
+        print("       provided reference needs: --ref ref.fasta")
+        sys.exit(1)
+
+    if modeA and modeB:
+        print("ERROR: Please choose either a custom reference (--id_ref, --bam_ref, blast_ref) to be created from a read OR provide an existing reference.fasta (..ref), not both.")
+        sys.exit(1)
+
+    if args.txt and not args.bam:
+        print("ERROR: --bam is required when --txt is provided as reads are being filtered from the bam file.")
+        sys.exit(1)
+
+    if args.methyl and modeB and (not args.region) and (not args.regions_bed):
+      print("ERROR: For --ref + --methyl you must provide either --region chr:start-end OR --regions_bed file.bed for methylation calculation.")
+      sys.exit(1)
+
+    if args.bam is None and args.methyl:
+        print("ERROR: --bam is required if you want to run --methyl.")
+        sys.exit(1)
+
+    if args.out_prefix:
+        prefix_name = args.out_prefix
+    else:
+        if modeA:
+            prefix_name = args.id_ref
+        else:
+            prefix_name = Path(args.ref).stem
+
+    if args.out_path:
+        outpath = Path(args.out_path)
+        outpath.mkdir(parents=True, exist_ok=True)
+    else:
+        if args.bam:
+            base_dir = Path(args.bam).resolve().parent
+        elif modeA:
+            base_dir = Path(args.bam_ref).resolve().parent
+        else:
+            base_dir = Path(args.ref).resolve().parent
+
+        if modeA:
+            dir_name = f"custref2bam_{prefix_name}"
+        else:
+            dir_name = f"ref2bam_{prefix_name}"
+
+        outpath = base_dir / dir_name
+        outpath.mkdir(parents=True, exist_ok=True)
+
+    def minimap2(file, ref_fasta, out_dir):
+        print("       ")
+        print("Alignment with Minimap2:")
+        print("       ")
+        file_in = os.path.basename(file)
+        ref_name = os.path.basename(ref_fasta).split('.')[0]
+        sam_file = ''.join([file_in.split('.')[0], "_", ref_name, ".sam"])
+
+        subprocess.call([
+            "minimap2", "-ax", "lr:hq", "--MD", "-L",
+            "-t", str(args.threads), "-Y", "-y",
+            "-o", str(Path(out_dir) / sam_file),
+            str(ref_fasta), str(Path(file).resolve())
+        ])
+        return sam_file
+
+    def samtools_bam(sam_input):
+        print("       ")
+        print("Sorting and indexing of .sam-file:")
+        print("       ")
+        sam_path = Path(sam_input)
+        bam_file = sam_path.with_suffix(".bam").name
+        bam_path = sam_path.with_suffix(".bam")
+
+        subprocess.call(["samtools", "sort", "-m", "15G", "-o", str(bam_path), str(sam_path)])
+        subprocess.call(["samtools", "index", str(bam_path)])
+        subprocess.call(["rm", str(sam_path)])
+        return bam_file
+
+    # reference
+    ref_fasta = None
+    bed_path = None
+
+    if modeA:
+        bam_ref = Path(args.bam_ref)
+        blast_ref = Path(args.blast_ref)
+
+        fasta_path = outpath / f"{prefix_name}.fa"
+        bed_path = outpath / f"{prefix_name}.bed"
+
+        print("Create custom reference from read:")
+        print(f"  id_ref    : {args.id_ref}")
+        print(f"  bam_ref   : {bam_ref}")
+        print(f"  blast_ref : {blast_ref}")
+
+        seq, is_reverse, read_len, is_unmapped = get_read_sequence(bam_ref, args.id_ref)
+
+        flipped = False
+        if is_unmapped:
+            print(f"Read {args.id_ref} is unaligned therefore read-orientation can't be determined.")
+        elif is_reverse:
+            print(f"Read {args.id_ref} is aligned reverse to reference – flipping to forward orientation.")
+            seq = reverse_complement(seq)
+            flipped = True
+        else:
+            print(f"Read {args.id_ref} is aligned in forward orientation.")
+        
+
+        write_fasta(args.id_ref, seq, fasta_path)
+        index_fasta_with_samtools(fasta_path)
+        parse_blast_to_bed(blast_ref, args.id_ref, bed_path, read_len, flipped)
+
+        ref_fasta = fasta_path
+
+        print("Done creating custom reference.")
+        print(f"FASTA : {fasta_path}")
+        print(f"FAIDX : {fasta_path}.fai")
+        print(f"BED   : {bed_path}")
+
+    else:
+        # Mode B
+        ref_fasta = Path(args.ref).resolve()
+        print("Using provided reference FASTA:")
+        print(f"  REF : {ref_fasta}")
+
+        # optional: create faidx if missing
+        if not Path(str(ref_fasta) + ".fai").exists():
+            print("No .fai found -> indexing reference with samtools faidx.")
+            index_fasta_with_samtools(ref_fasta)
+
+    # aligning reads to reference
+    if args.bam:
+        bam_in = Path(args.bam).resolve()
+
+        if args.txt:
+            print("Extract reads from bam using read_id.txt.")
+            txt_name = Path(args.txt).stem
+            bam_name = bam_in.stem
+            ID_bam = f"{bam_name}_{txt_name}.bam"
+            ID_out = outpath / ID_bam
+
+            try:
+                with open(ID_out, 'w') as out_f:
+                    subprocess.run(
+                        ['samtools', 'view', '-h', '-N', args.txt, str(bam_in)],
+                        check=True, text=True, stdout=out_f, stderr=subprocess.PIPE
+                    )
+                print(f"Extracted BAM written to: {ID_out}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error with samtools view: {e}")
+                sys.exit(1)
+
+            map_input = str(ID_out)
+        else:
+            print("No --txt provided -> whole bam will be aligned against reference.")
+            map_input = str(bam_in)
+
+        print("Align reads to reference.")
+        fastq = checkfile_fastq(map_input)
+        if fastq is None:
+            print("ERROR: could not create fastq.")
+            sys.exit(1)
+
+        sam_map = minimap2(fastq, ref_fasta, outpath)
+        bam_map = samtools_bam(str(outpath / sam_map))
+
+        # cleanup fastq if it was generated from bam
+        if map_input.endswith(".bam") and fastq.endswith(".fastq") and Path(fastq).exists():
+            subprocess.call(["rm", fastq])
+
+        print(f"Aligned BAM: {outpath / bam_map}")
+
+    else:
+        bam_map = None
+        print("No alignment requested (no --bam).")
+
+    # Methylation with modkit
+    if args.methyl:
+        if bam_map is None:
+            print("ERROR: --methyl requested but no aligned BAM exists.")
+            sys.exit(1)
+
+        print("       ")
+        print("Start Methylation-analysis with Modkit.")
+        print("       ")
+
+        bam_map_name = Path(bam_map).stem
+        meth_path = outpath / f"methylation-analysis_{prefix_name}"
+        meth_path.mkdir(parents=True, exist_ok=True)
+
+        modkit_bed = f"{bam_map_name}_modkit-methyl.bed"
+        modkit_bed_path = meth_path / modkit_bed
+
+        subprocess.call([
+            "modkit", "pileup",
+            str(outpath / bam_map),
+            str(modkit_bed_path),
+            "--cpg",
+            "--ref", str(ref_fasta)
+        ])
+
+        subprocess.call(["bgzip", str(modkit_bed_path)])
+        subprocess.call(["tabix", str(modkit_bed_path) + ".gz"])
+
+        # regions to summarize:
+        if args.regions_bed:
+          regions_bed = Path(args.regions_bed).resolve()
+        else:
+          if modeA:
+              regions_bed = bed_path
+          else:
+              # create a .bed from args.region
+              chrom, coords = args.region.split(":")
+              start, end = map(int, coords.split("-"))
+              regions_bed = meth_path / "coordinates_methcalc.bed"
+              with open(regions_bed, "w") as f:
+                  f.write(f"{chrom}\t{start - 1}\t{end}\n")
+
+        modout_all = meth_path / "modkit-STATS.tsv"
+        subprocess.call([
+            "modkit", "stats",
+            "--regions", str(regions_bed),
+            "-o", str(modout_all),
+            str(modkit_bed_path) + ".gz"
+        ])
+
+        # create bedGraph + bed from modkit stats 
+        output_bg = f"{bam_map_name}.bedgraph"
+        output_bed = f"{bam_map_name}.bed"
+
+        chrom_idx, start_idx, end_idx, value_idx = 0, 1, 2, 10
+
+        with open(modout_all, 'r') as fin, open(meth_path / output_bg, 'w', newline='') as fout:
+            reader = csv.reader(fin, delimiter='\t')
+            writer = csv.writer(fout, delimiter='\t')
+            fout.write("track type=bedGraph name='Percent_Methylation' description='Percent Methylation'\n")
+            next(reader, None)
+            for row in reader:
+                if len(row) <= value_idx:
+                    continue
+                bedgraph_row = [row[chrom_idx], row[start_idx], row[end_idx], row[value_idx]]
+                writer.writerow(bedgraph_row)
+
+        with open(modout_all, 'r') as fin, open(meth_path / output_bed, 'w', newline='') as fout:
+            reader = csv.reader(fin, delimiter='\t')
+            writer = csv.writer(fout, delimiter='\t')
+            fout.write("track type=bed name='Methylation_Labels' description='Percent Methylation as Name'\n")
+            next(reader, None)
+            for row in reader:
+                if len(row) <= value_idx:
+                    continue
+                try:
+                    formatted_percent = f"{float(row[value_idx]):.2f}"
+                    bed_row = [row[chrom_idx], row[start_idx], row[end_idx], formatted_percent]
+                    writer.writerow(bed_row)
+                except ValueError:
+                    continue
+
+        subprocess.call(["chown", "-R", "777", str(meth_path)])
+
+        print("Methylation outputs:")
+        print(f"  {modout_all}")
+        print(f"  {meth_path / output_bg}")
+        print(f"  {meth_path / output_bed}")
+
+    print("       ")
+    print("Workflow finished. Thank you for using this pipeline. TL :-)")
+    print("       ")
+
 
 if __name__ == "__main__":
-    main()            
+    main()
