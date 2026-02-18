@@ -9,6 +9,7 @@ We have developed an integrated approach combining an optimised wet-lab protocol
 **Update:** 
 DUCKS4 also calls directly the PAS-sequence to each read if pLAM is available and provides it in the haplotypes-resolved output csv-files. It tests if the PAS is intact (4qA), 10qA or differently disrupted. 
 
+We've also implemented a lighter version without variant-calling: [ducks4_wovar](https://github.com/tamara-nano/ducks4_wovar)
 
 ## Prerequisite
 
@@ -171,6 +172,7 @@ This repository contains the sequencing data from the human reference genomes HG
 If using the workflow for a publication please cite:
 
 <Löwenstern T., Madritsch M., Horner D., Brait N., Güleray Lafci N., Schachner A., Gerykova Bujalkova M., Kałużewski T., Szyld P., Hengstschläger M., Dremsek P., Laccone F. DUCKS4: A comprehensive workflow for Nanopore sequencing analysis of Facioscapulohumeral Muscular Dystrophy (FSHD). Human Genomics. Manuscript accepted.>
+
 
 
 
