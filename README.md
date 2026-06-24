@@ -37,7 +37,7 @@ Please follow the official installation instructions for your operating system.
 
 Pull docker image: 
 
-`docker pull ghcr.io/tamara-nano/fshd_ducks4:v1.2.0`
+`docker pull ghcr.io/tamara-nano/fshd_ducks4:v1.1.0`
 
 or 
 
@@ -52,7 +52,7 @@ download repository and unzip it \
 
 For running the tool:
 
-`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.2.0 --input /data/mysample.bam --methyl --variant`
+`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 --input /data/mysample.bam --methyl --variant`
 
 For showing more infos:
 
@@ -189,6 +189,11 @@ read-id5
 - Methylation: alignedreads.bedgraph, alignedreads.bed, alignedreads.methylbed, modkit-stats.tsv for the annotated regions if no region/regions_bed is provided.
 - D4Z4_BX_check/: BinI/XapI restriction site classification per RU (see BX check section above)
 
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c">
+    <img src="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c" width="900">
+  </a>
+  
 ### Curated methylation output
 
 Methylation values are reported for:
@@ -204,6 +209,8 @@ Additionally, the following aggregate regions are reported:
 - distal_unit: terminal RU plus pLAM
 
 distal_unit is included because distal methylation is particularly relevant for FSHD diagnostics.
+
+
 
 ---
 
@@ -243,6 +250,10 @@ The BX check output is written to `{out_prefix}/D4Z4_BX_check/` and contains:
 | `BX_restriction_sites.bed` | BinI/XapI site positions (includes fuzzy matching) within each RU for IGV navigation |
 
 IGV colors: blue = Chr10_D4Z4 (B+/X-), red = Chr4_D4Z4 (B-/X+), purple = Hybrid_D4Z4 (B-/X-), grey = ambiguous/unclassified, green distal D4Z4-S.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7112765f-2af9-4706-9b18-55241017411c" width="900">
+</p>
 
 
 ## Further analysis
