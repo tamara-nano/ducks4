@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd="${1:-run}"
+shift || true
+
+case "$cmd" in
+  run|"")
+    exec /usr/bin/python3 /ducks4/DUCKS4.py "$@"
+    ;;
+  id2bam2meth|id2)
+    exec /usr/bin/python3 /ducks4/DUCKS4_ID2bam2meth.py "$@"
+    ;;
+  help|-h|--help)
+    echo "Usage:"
+    echo "  ducks4 [DUCKS4.py args...]"
+    echo "  ducks4 id2bam2meth [args...]"
+    echo ""
+    echo "Examples:"
+    echo "  ducks4 --help"
+    echo "  ducks4 --input sample.bam --ref_t2t chm13.fa"
+    echo "  ducks4 id2bam2meth --help"
+    exit 0
+    ;;
+  *)
+    exec /usr/bin/python3 /ducks4/DUCKS4.py "$cmd" "$@"
+    ;;
+esac

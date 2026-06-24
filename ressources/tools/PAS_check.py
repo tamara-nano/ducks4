@@ -1,5 +1,5 @@
-import os, subprocess, time, shutil, sys
 import pysam
+import os, subprocess, time, shutil, sys
 
 script_path = os.path.abspath(os.path.dirname( __file__ ))
 
@@ -50,7 +50,7 @@ for read in bamfile.fetch(chrom, start_0, end_0):
     rows.append((read.query_name, read_seq, status))
 
 
-## q10
+#### q10
 
 chrom2 = "chr10"
 start_pos2 = 134726542 # 1-basiert
