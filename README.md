@@ -191,7 +191,7 @@ read-id5
 
 <p align="center">
   <a href="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c">
-    <img src="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c" width="900">
+    <img src="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c" width="700">
   </a>
   
 ### Curated methylation output
@@ -252,7 +252,7 @@ The BX check output is written to `{out_prefix}/D4Z4_BX_check/` and contains:
 IGV colors: blue = Chr10_D4Z4 (B+/X-), red = Chr4_D4Z4 (B-/X+), purple = Hybrid_D4Z4 (B-/X-), grey = ambiguous/unclassified, green distal D4Z4-S.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/7112765f-2af9-4706-9b18-55241017411c" width="900">
+  <img src="https://github.com/user-attachments/assets/7112765f-2af9-4706-9b18-55241017411c" width="700">
 </p>
 
 
