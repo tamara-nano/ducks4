@@ -42,7 +42,7 @@ Please follow the official installation instructions for your operating system.
 
 Pull docker image:
 
-`docker pull ghcr.io/tamara-nano/fshd_ducks4:v1.2.0`
+`docker pull ghcr.io/tamara-nano/fshd_ducks4:latest`
 
 or
 
@@ -51,17 +51,17 @@ Build image with dockerfile:
 download repository and unzip it \
 `cd /path/ducks4/`
 
-`docker build -t ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 .  `
+`docker build -t ghcr.io/tamara-nano/fshd_ducks4:latest .  `
 
 ## Usage
 
 For running the tool:
 
-`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.2.0 --input /data/mysample.bam --methyl --variant`
+`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:latest --input /data/mysample.bam --methyl --variant`
 
 For showing more infos:
 
-`docker run -it --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 --help`
+`docker run -it --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:latest --help`
 
 | **tags** | **Infos** |
 |:-----------------------------|:-----------------------------------------|
@@ -113,7 +113,7 @@ The results can then be further inspected in a genome viewer like the IGV-browse
 
 ### Mode A: for creating a custom reference
 ```
-docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 id2bam2meth \
+docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:latest id2bam2meth \
   --id_ref READ_ID \
   --bam_ref /data/sample-containing_id_ref-read.bam \
   --bam /data/sample.bam \
@@ -131,7 +131,7 @@ The BX restriction site check is automatically run after methylation analysis an
 
 ### Mode B: providing an existing reference
 ```
-docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:v1.2.0 id2bam2meth \
+docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:latest id2bam2meth \
   --ref /data/ref.fasta \
   --bam /data/sample.bam \
   --txt /data/read-ids.txt \
@@ -164,7 +164,7 @@ read-id5
 
 ### For showing more infos:
 
-`docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 id2bam2meth --help`
+`docker run -it --rm -v "$(pwd)":/data ghcr.io/tamara-nano/fshd_ducks4:latest id2bam2meth --help`
 
 | **tags** | **Infos** |
 |:-----------------------------|:-----------------------------------------|
