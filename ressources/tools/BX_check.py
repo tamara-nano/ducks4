@@ -6,6 +6,7 @@ import pandas as pd
 import pysam
 from pathlib import Path
 
+# v1.1.1
 
 def fuzzy_count(seq, pattern, max_mismatches=1):
     count = 0
@@ -138,7 +139,7 @@ def classify_read_ru_from_alignment(bam_path, ru_intervals, allele_id, out_dir):
                 qstart = 1,
                 qend   = len(region),
             )
-            
+
             if (
                 is_distal_s_unit(ru)
                 and bx["B_status"] in ["B-", "B?"]
@@ -209,7 +210,7 @@ def process_allele(bam_path, curated_tsv_path, out_dir, allele_id):
 def build_allele_bx_consensus(per_ru_df, allele_id, min_reads=3):
     """
     Build per-RU consensus BX classification across all reads for one allele.
-    Majority vote per RU position - confidence = fraction agreeing with winner.
+    Majority vote per RU position over read-pile-up.
     """
     if per_ru_df.empty:
         return pd.DataFrame()
@@ -225,7 +226,7 @@ def build_allele_bx_consensus(per_ru_df, allele_id, min_reads=3):
             if "curated_type" in ru_reads.columns and not ru_reads["curated_type"].empty
             else ""
         )
-        
+
         if curated_type_majority == "D4Z4-S":
             top_type = "D4Z4-S"
         top_count  = counts.iloc[0]
@@ -310,7 +311,7 @@ def find_restriction_sites_in_ru(bam_path, ru_intervals, prefix_name):
     """
     For each RU, find exact reference positions of BinI (CCTAGG) and XapI (AAATTCC) sites
     by scanning reads aligned to the custom reference.
-    Returns list of dicts with site positions on the reference.
+    Returns list with site positions on the reference.
     """
     BINI   = "CCTAGG"
     XAPI   = "AAATTCC"
@@ -360,7 +361,7 @@ def find_restriction_sites_in_ru(bam_path, ru_intervals, prefix_name):
                         q_site_start = q_start + i
                         q_site_end   = q_start + i + plen - 1
 
-                        # map back to reference
+                        # align back to reference
                         ref_site_start = query_to_ref.get(q_site_start)
                         ref_site_end   = query_to_ref.get(q_site_end)
 
@@ -386,7 +387,7 @@ def find_restriction_sites_in_ru(bam_path, ru_intervals, prefix_name):
 
     df = pd.DataFrame(site_rows)
 
-    # consensus: for each RU+site_name, take the most common reference position
+    # consensus: for each RU and site_name, take the most common reference position
     consensus = (
         df.groupby(["RU", "site_name", "ref_start", "ref_end", "contig", "exact"])
         .size()
@@ -416,7 +417,7 @@ def find_reference_in_allele_dir(allele_dir, allele_id):
             return candidates[0]
 
     return None
-  
+
 def run_single_allele(allele_dir, allele_id, out_dir):
     """Shared logic for processing one allele — used by both modes."""
 
@@ -448,6 +449,20 @@ def run_single_allele(allele_dir, allele_id, out_dir):
         curated_tsv = candidates[0]
 
     print(f"[INFO] Processing: {bam_file.name} with {curated_tsv.name}")
+
+    # find and copy reference into BX output dir for IGV
+    ref_fasta = find_reference_in_allele_dir(allele_dir, allele_id)
+    if ref_fasta is not None:
+        import shutil
+        ref_copy = out_dir / ref_fasta.name
+        if not ref_copy.exists():
+            shutil.copy2(str(ref_fasta), str(ref_copy))
+            fai = Path(str(ref_fasta) + ".fai")
+            if fai.exists():
+                shutil.copy2(str(fai), str(out_dir / fai.name))
+        print(f"[INFO] Reference: {ref_fasta.name} (in BX output dir)")
+    else:
+        print(f"[WARN] No reference found in {allele_dir}")
 
     per_ru_df = process_allele(
         bam_path         = bam_file,
@@ -517,7 +532,7 @@ def run_single_allele(allele_dir, allele_id, out_dir):
 
     return per_ru_df, array_summary
 
-  
+
 def main():
     ap = argparse.ArgumentParser(
         description="Per-RU BinI/XapI restriction site classification for DUCKS4 alleles."

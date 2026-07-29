@@ -34,7 +34,7 @@ def setup_logging(verbose: bool = False) -> None:
     )
 
 
-# BED / bedGraph 
+# BED / bedGraph
 def read_bed(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, sep="\t", header=None, comment="#")
     if df.shape[1] < 4:
@@ -301,13 +301,10 @@ def add_base_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-# anchor detection
 def find_anchor_indices(
     df: pd.DataFrame,
 ) -> tuple[Optional[int], Optional[int], Optional[str], Optional[str]]:
     """
-    Identify the true array anchors.
-
     Returns: marker_idx, plam_idx, haplotype_tag, orientation
 
     Orientation values:
@@ -381,7 +378,6 @@ def find_anchor_indices(
     return None, None, None, None
 
 
-# overlap / collapse
 def overlap_fraction(a_start: int, a_end: int, b_start: int, b_end: int) -> float:
     ov = max(0, min(a_end, b_end) - max(a_start, b_start))
     if ov == 0:
@@ -396,7 +392,6 @@ def collapse_duplicate_d4z4(
 ) -> pd.DataFrame:
     """
     Collapse strongly overlapping D4Z4-like hits inside the candidate array block.
-    Best BLAST hit (highest pident → bitscore → length) wins.
     """
     if subdf.empty:
         return subdf.copy()
@@ -491,7 +486,7 @@ def choose_true_terminal_repeat(
 
 # main curation
 
-PSEUDO_PLAM_MAX_LEN = 200  # real pLAM ≥200bp; proxy pseudo-hits are shorter
+PSEUDO_PLAM_MAX_LEN = 200  # real pLAM ≥200bp
 
 def reclassify_proximal_pseudo_plam(df: pd.DataFrame) -> pd.DataFrame:
 
@@ -520,7 +515,7 @@ def reclassify_proximal_pseudo_plam(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     return out
-  
+
 def curate_annotation(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy().sort_values(["start", "end"]).reset_index(drop=True)
 
@@ -532,10 +527,9 @@ def curate_annotation(df: pd.DataFrame) -> pd.DataFrame:
     out["is_distal"]       = False
     out["curation_reason"] = ""
 
-    # reclassify short pLAM hits missed by parse_blast_to_bed 
+    # reclassify short pLAM hits missed by parse_blast_to_bed
     out = reclassify_proximal_pseudo_plam(out)
 
-    # pseudo_pLAM: keep visible
     pseudo_plam_mask = out["feature_class"] == "pseudo_pLAM"
     out.loc[pseudo_plam_mask, "curated_name"]    = out.loc[pseudo_plam_mask, "raw_name"]
     out.loc[pseudo_plam_mask, "curated_type"]    = "pseudo_pLAM"
@@ -613,7 +607,6 @@ def curate_annotation(df: pd.DataFrame) -> pd.DataFrame:
                     out.at[idx, "curation_reason"] = (
                         "D4Z4_fragment_at_D4F104S1_deletion_boundary"
                     )
-                # else: fall through to outside_mask → chr4_ctrl normally
 
         out.at[marker_idx, "curation_reason"] = "array_proximal_boundary_D4F104S1_deleted"
 
@@ -659,7 +652,6 @@ def curate_annotation(df: pd.DataFrame) -> pd.DataFrame:
 
     # D4Z4_like hits outside the true array = chr4_ctrl
     outside_mask = (out["feature_class"] == "D4Z4_like") & ~candidate_mask
-    # but don't relabel pre-gap hits already labeled in deleted-D4F case
     if orientation == "forward_no_D4F104S1":
         outside_mask = outside_mask & (out["curation_reason"] == "")
     out.loc[outside_mask, "curated_name"]    = "chr4_ctrl"
@@ -782,7 +774,7 @@ def make_curated_bed(curated: pd.DataFrame) -> pd.DataFrame:
         "curation_reason",
     ]].copy()
 
-    # distal_unit aggregate region
+    # distal_unit
     count_for_ru = (
         curated["count_for_RU"].astype(str).str.strip().str.upper().isin(["TRUE", "WAHR", "1"])
         if "count_for_RU" in curated.columns
@@ -865,8 +857,6 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
             "Curate raw allele annotation BED into per-element anchored FSHD array annotation. "
-            "Handles normal arrays, inverted reads, and deleted D4F104S1 alleles. "
-            "Optionally applies the same keep/drop decisions to a matching bedGraph."
         )
     )
     p.add_argument("--bed",           required=True,  help="Input raw 4-column BED")

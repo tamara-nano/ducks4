@@ -6,6 +6,11 @@ Facioscapulohumeral Muscular Dystrophy (FSHD) is an autosomal dominant form of m
 
 We have developed an integrated approach combining an optimised wet-lab protocol with an automated bioinformatics workflow, called DUCKS4. It enables read-level resolution of the D4Z4 array for FSHD1 repeat sizing, variant detection for FSHD2, and detection of methylation patterns. Using NCBI BLAST, it assigns reads to chromosomes and haplotypes, supporting robust filtering and analysis. With long-read Nanopore sequencing technology, our tool enables precise determination of D4Z4 array size, individual haplotype assignment, methylation profiling, and complex allele analysis. It also allows for the detection of mosaicism and structural variation like interchromosomal translocations, providing a comprehensive, single-method solution for FSHD analysis.
 
+**v1.1.1:**
+
+Bug fix:
+- Fixed terminal RU chromosome origin for distal S/L RUs in the annotated reference-bed created with curate_annotation_bed.py in id2bam2meth.
+- Fixed terminal RU-annotation for distal S/L within the BX-check.
 
 **v1.1.0:**
 
@@ -24,7 +29,7 @@ Patch:
 
 Fix dplyr compatibility.
 
-**v1.0.1:** 
+**v1.0.1:**
 
 DUCKS4 directly determines the PAS sequence for each read if pLAM is present and reports PAS type (4qA, 10qA or disrupted) in the haplotype-resolved output tables.
 
@@ -35,11 +40,11 @@ Please follow the official installation instructions for your operating system.
 
 ## Installation
 
-Pull docker image: 
+Pull docker image:
 
-`docker pull ghcr.io/tamara-nano/fshd_ducks4:v1.1.0`
+`docker pull ghcr.io/tamara-nano/fshd_ducks4:v1.2.0`
 
-or 
+or
 
 Build image with dockerfile:
 
@@ -52,7 +57,7 @@ download repository and unzip it \
 
 For running the tool:
 
-`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.1.0 --input /data/mysample.bam --methyl --variant`
+`docker run --rm -v $(pwd):/data ghcr.io/tamara-nano/fshd_ducks4:v1.2.0 --input /data/mysample.bam --methyl --variant`
 
 For showing more infos:
 
@@ -92,18 +97,18 @@ We recommend using the tables alongside with viewing the bam-files in a genome v
 
 ## Analysis of individual read-subsets - ID2BAM2METH
 
-The DUCKS4-results make it easy to directly select reads for individual subsets for further alignment, optional methylation-calling and analysis. 
+The DUCKS4-results make it easy to directly select reads for individual subsets for further alignment, optional methylation-calling and analysis.
 If further subsets of reads should be filtered and analyzed, a read-id.txt needs to be provided along the alignment .bam-file.
 Furthermore a custom reference can be created from a read-id or an existing reference can be given.
 
-The intended the workflow is: 
+The intended the workflow is:
 > **DUCKS4** → manual review and allele-level subsetting of results → **ID2bam2meth** for improved allele-specific alignment and methylation analysis
 
 **Note**: Subsetting reads is necessary for example when two 4qA alleles are present and the methylation status should be called separately. The tool cannot distinguish two 4qA alleles and requires manual curation in that case.
 
-With this script it is possible to define a custom reference from a chosen read via read-id (e.g. choose a complete read from the 4qA output). 
+With this script it is possible to define a custom reference from a chosen read via read-id (e.g. choose a complete read from the 4qA output).
 Optionally provide a subset of reads to align against (either read-ids via TXT and/or a BAM-file) and optionally call methylation.
-For the custom reference the blast-results of this read are annotated within an annotation.bed file and if --methyl is chosen the average methylation will be calculated for each entry within the annotation.bed file. 
+For the custom reference the blast-results of this read are annotated within an annotation.bed file and if --methyl is chosen the average methylation will be calculated for each entry within the annotation.bed file.
 The results can then be further inspected in a genome viewer like the IGV-browser.
 
 ### Mode A: for creating a custom reference
@@ -145,7 +150,7 @@ or
 If no custom regions are provided, ID2bam2meth automatically generates annotations from the supplied reference FASTA using BLAST. \
 The reference FASTA is automatically copied into the output folder for use with the BX check and IGV visualization.
 
-### Creating the read-ID.txt: 
+### Creating the read-ID.txt:
 Simply copy the read-IDs you want to subset and filter from the DUCKS4-output tables into a txt-file:
 
 Format read-id.txt:
@@ -189,11 +194,6 @@ read-id5
 - Methylation: alignedreads.bedgraph, alignedreads.bed, alignedreads.methylbed, modkit-stats.tsv for the annotated regions if no region/regions_bed is provided.
 - D4Z4_BX_check/: BinI/XapI restriction site classification per RU (see BX check section above)
 
-<p align="center">
-  <a href="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c">
-    <img src="https://github.com/user-attachments/assets/ccc61679-d2fb-4f4a-bb27-b6028b02339c" width="700">
-  </a>
-  
 ### Curated methylation output
 
 Methylation values are reported for:
@@ -209,8 +209,6 @@ Additionally, the following aggregate regions are reported:
 - distal_unit: terminal RU plus pLAM
 
 distal_unit is included because distal methylation is particularly relevant for FSHD diagnostics.
-
-
 
 ---
 
@@ -250,10 +248,6 @@ The BX check output is written to `{out_prefix}/D4Z4_BX_check/` and contains:
 | `BX_restriction_sites.bed` | BinI/XapI site positions (includes fuzzy matching) within each RU for IGV navigation |
 
 IGV colors: blue = Chr10_D4Z4 (B+/X-), red = Chr4_D4Z4 (B-/X+), purple = Hybrid_D4Z4 (B-/X-), grey = ambiguous/unclassified, green distal D4Z4-S.
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/7112765f-2af9-4706-9b18-55241017411c" width="700">
-</p>
 
 
 ## Further analysis

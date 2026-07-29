@@ -2,7 +2,7 @@ import os, subprocess, time, shutil, sys
 from argparse import ArgumentParser
 from pprint import pprint
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # Implement ArgParser
 parser = ArgumentParser(
@@ -38,7 +38,7 @@ fastq_file = os.path.basename(args.finput)
 script_path = os.path.abspath(os.path.dirname( __file__ ))
 db_path = os.path.join(script_path, "ressources","blast_db", "FSHD-blast")
 blast_path = os.path.join(script_path, "ressources","tools", "ncbi-blast-2.14.0+", "bin", "blastn")
-ducks4_path = os.path.join(script_path, "ressources","tools", '') 
+ducks4_path = os.path.join(script_path, "ressources","tools", '')
 rscript = os.path.join(ducks4_path, "FSHD_analysis.R")
 
 
@@ -53,8 +53,8 @@ def main():
     print("The whole workflow is based on T2T-chm13v2.0.")
     print("Code written and adapted by TL :-)")
     print("       ")
-    
-    
+
+
     def checkfile_fastq(file_in):
       file_out = file_in.rsplit('.', 1)[0] + '.fastq'
       if file_in.endswith('bam'):
@@ -94,7 +94,7 @@ def main():
         print(f"This file-format is not supported!")
         return None
       return file_out
-    
+
     def checkfile_fasta(file_in):
       # Test, if file exists:
       file_out = file_in.rsplit('.', 1)[0] + '.fasta'
@@ -157,7 +157,7 @@ def main():
         print(f"This file-format is not supported!")
         return None
       return file_out
-    
+
     def minimap2(file):
       print("       ")
       print("Mapping with Minimap2:")
@@ -170,8 +170,8 @@ def main():
         subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", args.threads, "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "chm13v2.0.fa"), os.path.join(path, file_in)])
       else:
         subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "chm13v2.0.fa"), os.path.join(path, file_in)])
-      return sam_file 
-    
+      return sam_file
+
     def minimap2_hg38(file):
       print("       ")
       print("Mapping with Minimap2:")
@@ -185,7 +185,7 @@ def main():
       else:
         subprocess.call(["minimap2", "-ax", "lr:hq", "--MD", "-L", "-t", "45", "-Y", "-y", "-o", os.path.join(path, sam_file), os.path.join(ref_path, "Homo_sapiens_GRCh38_no_alt.fasta"), os.path.join(path, file_in)])
       return sam_file
-    
+
     def samtools_bam(sam_input):
       print("       ")
       print("Sorting and indexing of .sam-file:")
@@ -204,7 +204,7 @@ def main():
       subprocess.call(["rm", os.path.join(path, sam_file)])
       return bam_file
 
-      
+
     def check_ID(ID):
       # get the size of file
       ID_file = os.path.basename(ID)
@@ -219,7 +219,7 @@ def main():
         subprocess.call(["rm", os.path.join(path, ID_file)])
         return None
       else:
-        ID_sam = ''.join([file_name, "_", ID_file.split('.')[0], ".sam"]) 
+        ID_sam = ''.join([file_name, "_", ID_file.split('.')[0], ".sam"])
         ID_bam = ''.join([file_name, "_", ID_file.split('.')[0], ".bam"])
         fsf = open(os.path.join(path, ID_bam), "w")
         subprocess.call(['samtools', 'view',  '-h', '-N', os.path.join(path, ID_file), os.path.join(path_sample, bam_map)], stdout = fsf)
@@ -236,9 +236,9 @@ def main():
 
 
     ### START WORKFLOW  ###
-    
+
     ## Blast reads against FSHD-database
-    
+
     fastq_file = os.path.basename(args.finput)
     file_name = fastq_file.split('.')[0]
     blast_file = ''.join([fastq_file.split('.')[0], "_fshd-blast.txt"])
@@ -250,31 +250,31 @@ def main():
     print("       ")
     subprocess.call([blast_path, "-db", db_path, "-query", fasta_file, "-num_threads", "32", "-out", os.path.join(FSHD_path, blast_file), "-outfmt", '6 qseqid sseqid pident slen length mismatch gapopen qstart qend sstart send evalue bitscore'])
     subprocess.call(["rm", fasta_file])
-    
+
     print("       ")
     print("Start FSHD-analysis!")
     print("       ")
-    
-    
+
+
     ## map reads - FSHD-path
-    
+
     map_file = checkfile_fastq(os.path.join(path_sample, fastq_file))
     sam_map = minimap2(map_file)
     bam_map = samtools_bam(os.path.join(path_sample, sam_map))
-    
-    
+
+
     ## PAS-checK
-    
+
     passcript = os.path.join(ducks4_path, "PAS_check.py")
     subprocess.run(["/usr/bin/python3", passcript, os.path.join(path_sample, bam_map), FSHD_path])
     pas_file = "PAS.txt"
-    
-    
-    ## Provide blast_file to R-script  
-    
-    subprocess.call(["Rscript", rscript, os.path.join(FSHD_path, blast_file), os.path.join(FSHD_path, "PAS.txt"), FSHD_path])   
-    
-    
+
+
+    ## Provide blast_file to R-script
+
+    subprocess.call(["Rscript", rscript, os.path.join(FSHD_path, blast_file), os.path.join(FSHD_path, "PAS.txt"), FSHD_path])
+
+
     # Filter out Haplotypes and map
     ID_path = os.path.join(FSHD_path, "read-IDs")
     os.mkdir(ID_path)
@@ -285,31 +285,31 @@ def main():
     q4B_complete = check_ID(os.path.join(FSHD_path, "4qB_complete-reads-ID.txt"))
     D4Z4_chr4 = check_ID(os.path.join(FSHD_path, "D4Z4-only_chr4-reads-ID.txt"))
     D4Z4_chr10 = check_ID(os.path.join(FSHD_path, "D4Z4-only_chr10-reads-ID.txt"))
-    
+
     chr4_undefined = check_ID(os.path.join(FSHD_path, "chr4-undefined_all-reads-ID.txt"))
     chr10_all = check_ID(os.path.join(FSHD_path, "chr10_all-reads-ID.txt"))
     chr10_complete = check_ID(os.path.join(FSHD_path, "chr10_complete-reads-ID.txt"))
-    
-    
+
+
     ## Calculation of coverage in the region chr4:192667301-192902247
     print("Calculate coverage with samtools coverage for region chr4:192667301-192902247.")
     coverage = "coverage.txt"
     subprocess.call(["samtools", "coverage",  "-r", "chr4:192667301-192902247", os.path.join(path_sample, bam_map), "-o", os.path.join(FSHD_path, coverage)])
-    
-    
+
+
     ## Methylation calculation with modkit
-    
+
     if args.methyl:
-      print("       ")    
+      print("       ")
       print("Start Methylation-analysis with Modkit.")
       print("Note: Methylation-analysis is still a test-feature.")
       print("       ")
       q4A_bam_complete = next((f for f in os.listdir(FSHD_path) if "4qA_complete-reads-ID" in f and f.endswith(".bam")), None)
       q4A_bam_all = next((f for f in os.listdir(FSHD_path) if "4qA_all-reads-ID" in f and f.endswith(".bam")), None)
       chimeric = next((f for f in os.listdir(FSHD_path) if "chimeric" in f and f.endswith(".bam")), None)
-      
+
       # create bedmethyl
-  
+
       ref_path = os.path.join(script_path, "ressources","reference")
       ref_path = str(ref_path)
       meth_path = os.path.join(FSHD_path, "methylation-analysis")
@@ -321,19 +321,19 @@ def main():
         modkit_bed_allgz = "4qA-all-reads_modkit-methyl.bed.gz"
         subprocess.call(["bgzip", os.path.join(meth_path, modkit_bed_all)])
         subprocess.call(["tabix", os.path.join(meth_path, modkit_bed_allgz)])
-        
+
         bed = ''.join(["distal-RU_gene-body_methcalc.bed"])
         bed_file = os.path.join(meth_path, bed)
-      
+
         with open(bed_file, "w") as f:
           f.write("chr4\t193540345\t193540599\tDR1_distal\n")
           f.write("chr4\t193540172\t193543634\tdistal_unit\n")
-          
 
-        
-        modout_all = "4qA-all-reads_modkit-STATS.tsv" 
+
+
+        modout_all = "4qA-all-reads_modkit-STATS.tsv"
         subprocess.call(["modkit", "stats", "--regions", bed_file, "-o", os.path.join(meth_path, modout_all), os.path.join(meth_path, modkit_bed_allgz)])
-    
+
       if q4A_bam_complete:
         modkit_bed_complete = "4qA-complete-reads_modkit-methyl.bed"
         q4A_bam_complete = str(q4A_bam_complete)
@@ -343,7 +343,7 @@ def main():
         subprocess.call(["tabix", os.path.join(meth_path, modkit_bed_completegz)])
         modout_complete = "4qA-complete-reads_modkit-STATS.tsv"
         subprocess.call(["modkit", "stats", "--regions", bed_file, "-o", os.path.join(meth_path, modout_complete), os.path.join(meth_path, modkit_bed_completegz)])
-        
+
       if chimeric:
         modkit_bed_chimeric = "chimeric-reads_modkit-methyl.bed"
         chimeric = str(chimeric)
@@ -362,33 +362,33 @@ def main():
       else:
         print("No 4qA-Haplotypes or chimeric-reads found, therefore no Methylation-analysis.")
 
-   
-    
+
+
     # variant_calling
-    
+
     if args.variant:
       ref_path = os.path.join(script_path, "ressources","reference", '')
       varscript = os.path.join(ducks4_path, "FSHD_variant.py")
-      
+
       print("Map to HG38 for variant calling and annotation.")
       #map_file = checkfile_fastq(input_file)
       sam_map = minimap2_hg38(map_file)
       bam_map_hg38 = samtools_bam(os.path.join(path_sample, sam_map))
-      
+
       if args.threads:
         subprocess.run(["conda", "run", "-n", "clair3", "/usr/bin/python3", varscript, os.path.join(path_sample, bam_map_hg38), FSHD_path, ref_path, os.path.join(path_sample, bam_map), str(args.threads)])
       else:
         subprocess.run(["conda", "run", "-n", "clair3", "/usr/bin/python3", varscript, os.path.join(path_sample, bam_map_hg38), FSHD_path, ref_path, os.path.join(path_sample, bam_map)])
-      
+
       subprocess.call(["rm", os.path.join(path_sample, bam_map_hg38)])
       subprocess.call(["rm", os.path.join(path_sample, ''.join([bam_map_hg38, ".bai"]))])
- 
+
     if args.finput.endswith(".bam"):
       os.remove(map_file)  # (=fastq)
-    
-    
-    
-    
+
+
+
+
     subprocess.call(["chmod", "-R", "777", FSHD_path])
 
     print("       ")
@@ -401,4 +401,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()            
+    main()
