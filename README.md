@@ -1,3 +1,4 @@
+<img width="3323" height="2273" alt="BX-analysis" src="https://github.com/user-attachments/assets/75518fd3-a809-4f72-bf73-3e2d59ddaf2d" />
 # DUCKS4
 
 FSHD-analysis tool for Nanopore-Sequencing.
@@ -194,6 +195,7 @@ read-id5
 - Methylation: alignedreads.bedgraph, alignedreads.bed, alignedreads.methylbed, modkit-stats.tsv for the annotated regions if no region/regions_bed is provided.
 - D4Z4_BX_check/: BinI/XapI restriction site classification per RU (see BX check section above)
 
+
 ### Curated methylation output
 
 Methylation values are reported for:
@@ -209,6 +211,10 @@ Additionally, the following aggregate regions are reported:
 - distal_unit: terminal RU plus pLAM
 
 distal_unit is included because distal methylation is particularly relevant for FSHD diagnostics.
+
+<img width="2715" height="2695" alt="SF2_methylation2" src="https://github.com/user-attachments/assets/7fdc4ca1-39ca-4866-b2a9-b03a7ac9865a" />
+Fig.1.: Example of 4 alleles after final curation run by id2bam2meth, alignment against chosen read as custom reference and methylation calling. 
+
 
 ---
 
@@ -246,6 +252,8 @@ The BX check output is written to `{out_prefix}/D4Z4_BX_check/` and contains:
 | `BX_sites.bed` | RU-level BED colored by D4Z4 type for IGV (itemRgb) |
 | `BX_sites.bedgraph` | Per-RU consensus confidence as bedGraph for IGV |
 | `BX_restriction_sites.bed` | BinI/XapI site positions (includes fuzzy matching) within each RU for IGV navigation |
+
+<img width="3323" height="2273" alt="BX-analysis" src="https://github.com/user-attachments/assets/53f49e0f-c2cb-46b2-8127-35542992a8d9" />
 
 IGV colors: blue = Chr10_D4Z4 (B+/X-), red = Chr4_D4Z4 (B-/X+), purple = Hybrid_D4Z4 (B-/X-), grey = ambiguous/unclassified, green distal D4Z4-S.
 
