@@ -1,4 +1,3 @@
-<img width="3323" height="2273" alt="BX-analysis" src="https://github.com/user-attachments/assets/75518fd3-a809-4f72-bf73-3e2d59ddaf2d" />
 # DUCKS4
 
 FSHD-analysis tool for Nanopore-Sequencing.
