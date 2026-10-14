@@ -6,7 +6,7 @@ Facioscapulohumeral Muscular Dystrophy (FSHD) is an autosomal dominant form of m
 
 We have developed an integrated approach combining an optimised wet-lab protocol with an automated bioinformatics workflow, called DUCKS4. It enables read-level resolution of the D4Z4 array for FSHD1 repeat sizing, variant detection for FSHD2, and detection of methylation patterns. Using NCBI BLAST, it assigns reads to chromosomes and haplotypes, supporting robust filtering and analysis. With long-read Nanopore sequencing technology, our tool enables precise determination of D4Z4 array size, individual haplotype assignment, methylation profiling, and complex allele analysis. It also allows for the detection of mosaicism and structural variation like interchromosomal translocations, providing a comprehensive, single-method solution for FSHD analysis.
 
-> **Experimental DUCKS4-Advanced branch**
+> **Experimental DUCKS4-advanced repository**
 >
 > A new experimental DUCKS4 version with allele-level reconstruction, sequence fingerprinting, homolog-specific phasing and allele-specific methylation is available here:
 > This is an experimental repository and results should be interpreted with caution
